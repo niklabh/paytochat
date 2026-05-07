@@ -33,6 +33,8 @@ export interface UserDoc {
     acceptedChains: Chain[];
     /** Allow only specific tokens. */
     acceptedTokens: Token[];
+    /** Email me when a new (qualifying) message arrives. */
+    emailNotifications: boolean;
   };
   stats: {
     totalEarnedUSD: number;
@@ -95,4 +97,5 @@ export const DEFAULT_USER_SETTINGS: UserDoc["settings"] = {
     "Hey! I've moved DMs to Pay to Chat — drop me a message at https://paytochat.fun/{handle} and I'll read it. Even $1 puts you ahead of the spam queue.",
   acceptedChains: ["solana", "ethereum"],
   acceptedTokens: ["USDC", "USDT"],
+  emailNotifications: true,
 };

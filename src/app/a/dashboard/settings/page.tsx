@@ -27,6 +27,7 @@ export default function SettingsPage() {
   const [acceptSol, setAcceptSol] = useState(true);
   const [acceptUSDC, setAcceptUSDC] = useState(true);
   const [acceptUSDT, setAcceptUSDT] = useState(true);
+  const [emailNotifications, setEmailNotifications] = useState(true);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -46,6 +47,7 @@ export default function SettingsPage() {
     setAcceptSol(profile.settings.acceptedChains.includes("solana"));
     setAcceptUSDC(profile.settings.acceptedTokens.includes("USDC"));
     setAcceptUSDT(profile.settings.acceptedTokens.includes("USDT"));
+    setEmailNotifications(profile.settings.emailNotifications ?? true);
   }, [profile]);
 
   async function save() {
@@ -78,6 +80,7 @@ export default function SettingsPage() {
         "settings.autoReplyTemplate": autoReply.slice(0, 280),
         "settings.acceptedChains": acceptedChains,
         "settings.acceptedTokens": acceptedTokens,
+        "settings.emailNotifications": emailNotifications,
       });
       toast.success("Saved");
     } catch (e) {
@@ -194,6 +197,26 @@ export default function SettingsPage() {
               <Switch checked={acceptUSDT} onChange={setAcceptUSDT} label="USDT" />
             </div>
           </div>
+        </div>
+      </Card>
+
+      <Card>
+        <h2 className="text-lg font-semibold">Notifications</h2>
+        <p className="mt-1 text-sm text-muted">
+          Get an email when a new message lands in your inbox. Paid messages
+          still respect the &ldquo;notify above&rdquo; threshold above.
+        </p>
+        <div className="mt-4 flex items-center justify-between gap-4 rounded-xl bg-white/3 border border-white/5 px-3 py-3">
+          <div className="min-w-0">
+            <div className="text-sm font-medium">Email me about new messages</div>
+            <div className="text-xs text-muted">
+              Sent to {user?.email || "your account email"}.
+            </div>
+          </div>
+          <Switch
+            checked={emailNotifications}
+            onChange={setEmailNotifications}
+          />
         </div>
       </Card>
 

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { adminAuth, adminDb } from "@/lib/firebase/admin";
 import { verifyPayment } from "@/lib/payments/verify";
 import { sanitizeMessageHtml } from "@/lib/rich-text.server";
+import { sendNewMessageEmail } from "@/lib/email/sendgrid";
 import {
   Timestamp,
   FieldValue,
@@ -252,10 +253,60 @@ export async function POST(req: Request) {
     }
   });
 
+  // Best-effort: email the recipient. Never block the response on this.
+  void notifyRecipientByEmail({
+    recipient,
+    sender,
+    amountUSD,
+    isFree: status === "free",
+    preview: bodyPlain,
+  });
+
   return NextResponse.json({
     ok: true,
     messageId: messageRef.id,
     status,
     amountUSD,
   });
+}
+
+/**
+ * Fire-and-forget recipient email notification. Honours the user's
+ * `emailNotifications` toggle and `notifyThresholdUSD` (paid messages only).
+ * Errors are swallowed and logged; this must never break the send flow.
+ */
+async function notifyRecipientByEmail(args: {
+  recipient: UserDoc;
+  sender: UserDoc;
+  amountUSD: number;
+  isFree: boolean;
+  preview: string;
+}): Promise<void> {
+  try {
+    const { recipient, sender, amountUSD, isFree, preview } = args;
+
+    if (recipient.settings?.emailNotifications === false) return;
+
+    // For paid messages, only ping when the tip clears the user's threshold.
+    // Free / cool-off messages always notify (subject to the master toggle).
+    const notifyThreshold = recipient.settings?.notifyThresholdUSD ?? 0;
+    if (!isFree && amountUSD < notifyThreshold) return;
+
+    const authUser = await adminAuth().getUser(recipient.uid);
+    const toEmail = authUser.email;
+    if (!toEmail || authUser.disabled) return;
+
+    await sendNewMessageEmail({
+      toEmail,
+      recipientHandle: recipient.handle,
+      recipientDisplayName: recipient.displayName,
+      senderHandle: sender.handle,
+      senderDisplayName: sender.displayName,
+      preview,
+      amountUSD,
+      isFree,
+    });
+  } catch (err) {
+    console.error("[notifyRecipientByEmail] failed", err);
+  }
 }
