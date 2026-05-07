@@ -1,0 +1,60 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isMe(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    // Users:
+    //  - Public profile fields are readable by anyone (so /[handle] works
+    //    server-rendered and senders can see thresholds before paying).
+    //  - Only the user themselves may write. The handle is set on creation
+    //    and may not be changed.
+    match /users/{uid} {
+      allow read: if true;
+
+      allow create: if isMe(uid)
+        && request.resource.data.uid == uid
+        && request.resource.data.handleLower == request.resource.data.handle.lower();
+
+      allow update: if isMe(uid)
+        && request.resource.data.uid == resource.data.uid
+        && request.resource.data.handle == resource.data.handle
+        && request.resource.data.handleLower == resource.data.handleLower;
+
+      allow delete: if false;
+    }
+
+    // Messages: only the server (Admin SDK) is allowed to write — payments
+    // must be verified on-chain server-side before a message exists.
+    // Recipients & senders can read their own messages.
+    match /messages/{messageId} {
+      allow read: if signedIn()
+        && (request.auth.uid == resource.data.recipientId
+            || request.auth.uid == resource.data.senderId);
+      allow create, update, delete: if false;
+    }
+
+    // Conversations: participants can read. Participants may update only
+    // these fields: isFree, unreadCount.<theirUid>. The server owns the rest.
+    match /conversations/{convId} {
+      allow read: if signedIn() && request.auth.uid in resource.data.participants;
+
+      allow create: if false;
+
+      allow update: if signedIn()
+        && request.auth.uid in resource.data.participants
+        && request.resource.data.diff(resource.data)
+            .affectedKeys()
+            .hasOnly(['isFree', 'unreadCount']);
+
+      allow delete: if false;
+    }
+  }
+}

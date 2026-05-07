@@ -1,101 +1,150 @@
-import Image from "next/image";
+import Link from "next/link";
+import { MarketingNav } from "@/components/nav";
+import { Button } from "@/components/ui";
+import {
+  Wallet,
+  Coins,
+  ShieldCheck,
+  Zap,
+  HandCoins,
+  Eye,
+  ArrowRight,
+} from "lucide-react";
 
-export default function Home() {
+export default function LandingPage() {
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="https://nextjs.org/icons/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+    <main className="min-h-screen">
+      <MarketingNav />
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="https://nextjs.org/icons/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+      {/* Hero */}
+      <section className="relative mx-auto max-w-6xl px-4 pt-12 pb-24 md:pt-24 md:pb-32 text-center">
+        <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-muted">
+          <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" /> Live on
+          paytochat.fun
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
+        <h1 className="mt-6 text-5xl md:text-7xl font-black tracking-tight leading-[1.05] text-balance">
+          Make people <span className="gradient-text">pay</span> to land in your inbox.
+        </h1>
+        <p className="mt-6 text-lg md:text-xl text-muted max-w-2xl mx-auto text-balance">
+          Spam, marketing blasts, cold pitches — your attention is worth more.
+          Senders attach <span className="text-foreground">USDC or USDT</span> on Solana or
+          Ethereum. The tip amount stays hidden until you tap to reveal.
+        </p>
+        <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-3">
+          <Link href="/a/sign-up">
+            <Button size="lg" className="px-8">
+              Claim your link <ArrowRight size={18} />
+            </Button>
+          </Link>
+          <Link href="/a/sign-in">
+            <Button size="lg" variant="outline" className="px-8">
+              I already have an account
+            </Button>
+          </Link>
+        </div>
+        <p className="mt-4 text-xs text-muted">
+          Free to claim a handle. We never custody funds — payments go straight to your wallet.
+        </p>
+      </section>
+
+      {/* How it works */}
+      <section className="mx-auto max-w-6xl px-4 pb-20">
+        <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-center mb-12">
+          How it works
+        </h2>
+        <div className="grid md:grid-cols-3 gap-4">
+          {[
+            {
+              Icon: Wallet,
+              title: "1. Connect your wallets",
+              body: "Drop in an Ethereum address and a Solana address. Set thresholds for what gets through and what triggers a notification.",
+            },
+            {
+              Icon: HandCoins,
+              title: "2. Share your link",
+              body: "paytochat.fun/yourname. Drop it in your X bio, your IG link tree, your email signature. Senders pay USDC or USDT directly to your wallet.",
+            },
+            {
+              Icon: Eye,
+              title: "3. Tap to reveal",
+              body: "The tip amount stays hidden until you tap to open the message. Once opened, the sender gets a read receipt and you keep the tip.",
+            },
+          ].map(({ Icon, title, body }) => (
+            <div
+              key={title}
+              className="glass rounded-2xl p-6 hover:border-brand/30 transition-colors"
+            >
+              <Icon className="text-brand-300" size={28} />
+              <h3 className="mt-4 text-lg font-semibold">{title}</h3>
+              <p className="mt-2 text-sm text-muted">{body}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Features grid */}
+      <section className="mx-auto max-w-6xl px-4 pb-24">
+        <div className="grid md:grid-cols-2 gap-4">
+          <Feature
+            Icon={Coins}
+            title="USDC + USDT, on the chain you choose"
+            body="Stablecoins only — no price guessing. Senders pick Solana for sub-cent fees or Ethereum for the network they already use. You receive on your own wallet, instantly."
           />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
+          <Feature
+            Icon={Zap}
+            title="Cool-off & free chats"
+            body="When someone pays once, they unlock a 24-hour free reply window — your call to extend it. Mark a thread as a free chat any time and it stops costing them."
           />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
+          <Feature
+            Icon={ShieldCheck}
+            title="No middleman"
+            body="We never hold the money. The Pay to Chat server only verifies the on-chain transaction matches the message and unlocks the reveal."
           />
-          Go to nextjs.org →
-        </a>
+          <Feature
+            Icon={Eye}
+            title="The amount stays hidden"
+            body="The whole point: the recipient can't pre-judge by tip size. They have to read the message first. Then they swipe to learn what it was worth."
+          />
+        </div>
+      </section>
+
+      {/* CTA */}
+      <section className="mx-auto max-w-3xl px-4 pb-32 text-center">
+        <h2 className="text-3xl md:text-5xl font-bold tracking-tight text-balance">
+          Your inbox isn&apos;t a free dumping ground.
+        </h2>
+        <p className="mt-4 text-muted text-lg">Charge what your time is worth.</p>
+        <Link href="/a/sign-up" className="inline-block mt-8">
+          <Button size="lg" className="px-8">
+            Claim your handle <ArrowRight size={18} />
+          </Button>
+        </Link>
+      </section>
+
+      <footer className="border-t border-white/5 py-8 text-center text-xs text-muted">
+        <p>
+          paytochat.fun · Built on Firebase, Solana &amp; Ethereum · Stablecoins are
+          subject to issuer terms.
+        </p>
       </footer>
+    </main>
+  );
+}
+
+function Feature({
+  Icon,
+  title,
+  body,
+}: {
+  Icon: typeof Wallet;
+  title: string;
+  body: string;
+}) {
+  return (
+    <div className="glass rounded-2xl p-6">
+      <Icon className="text-brand-300" size={24} />
+      <h3 className="mt-4 text-lg font-semibold">{title}</h3>
+      <p className="mt-2 text-sm text-muted">{body}</p>
     </div>
   );
 }

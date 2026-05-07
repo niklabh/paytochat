@@ -1,36 +1,311 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Pay to Chat
 
-## Getting Started
+> Make people **pay** to land in your inbox.
 
-First, run the development server:
+A web app at **[paytochat.fun](https://paytochat.fun)** where senders attach
+USDC or USDT (on Solana or Ethereum) to a message. The recipient sees a clean
+inbox of locked cards — the **tip amount stays hidden until they tap to
+reveal**. Stop ignoring DM requests; charge what your attention is worth.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## Features
+
+- **Rich-text messages with images** — bold, headings, lists, blockquotes,
+  links and inline images via a built-in Tiptap editor. Drop, paste, or pick
+  an image to attach; we store it in Firebase Storage and embed it inline.
+  Bodies are sanitized server-side before being persisted.
+- **Hidden-amount messaging** — recipients see who sent it, but not how much
+  it's worth, until they reveal.
+- **Stablecoins on the chain you choose** — USDC / USDT on Solana mainnet or
+  Ethereum mainnet. We never custody funds; senders transfer directly to the
+  recipient's wallet and the server only verifies the on-chain transaction
+  before unlocking the message.
+- **Tap-to-reveal inbox** — a scannable list of locked messages. One tap
+  reveals the body and the tip amount; opened messages stay in the list with
+  the amount visible. Filter by All / Unread / Opened.
+- **Per-recipient settings** — minimum tip threshold, notify-me threshold,
+  cool-off window, accepted chains/tokens.
+- **Cool-off window** — once someone pays, they unlock a free reply window
+  (default 24 h, configurable).
+- **Free chats** — flip any thread to free; that sender no longer needs to pay.
+- **Read receipts** — sender sees when their message was opened.
+- **Public profile** at `paytochat.fun/<handle>` for senders to land on.
+- **DM auto-reply generator** — copy-paste template for X / Instagram DM
+  requests pointing them at your Pay to Chat link.
+- **Wallet connectors** — RainbowKit (Coinbase, MetaMask, WalletConnect…) for
+  EVM and Solana Wallet Adapter (Phantom, Backpack, Solflare via Wallet
+  Standard) for Solana.
+- **Responsive** — works on mobile and desktop.
+
+## Tech
+
+- **Frontend** — Next.js 14 App Router, TypeScript, Tailwind CSS
+- **Editor** — Tiptap (ProseMirror) with image, link, lists, headings
+- **Auth & data** — Firebase Auth (email + Google) + Firestore + Cloud Storage
+- **EVM payments** — wagmi v2 + viem + RainbowKit (Ethereum mainnet, ERC-20)
+- **Solana payments** — `@solana/web3.js` + `@solana/spl-token` + Solana Wallet
+  Adapter
+- **Server-side payment verification** — public RPCs (configurable) parse the
+  transaction, confirm the recipient address, token, and amount.
+
+## Project layout
+
+```
+src/
+  app/
+    page.tsx                       landing
+    [handle]/                      public profile + send-with-pay form
+    a/                             app routes (kept off the root so handles can live there)
+      sign-in/, sign-up/           auth
+      dashboard/
+        page.tsx                   swipe inbox
+        sent/                      sent messages with read receipts
+        settings/                  profile, wallets, thresholds, free chats, auto-reply
+    api/
+      messages/send/route.ts       creates a message, verifies on-chain payment
+      messages/open/route.ts       reveal a message, start cool-off, increment stats
+    layout.tsx, providers.tsx, globals.css
+  components/                      ui primitives, nav, swipe deck, rich editor + renderer
+  lib/
+    auth-context.tsx               Firebase auth React context
+    firebase/{client,admin,storage}.ts  web SDK + admin SDK + image upload helper
+    payments/{tokens,client,verify}.ts
+    rich-text.ts                   universal HTML → text helpers
+    rich-text.server.ts            server-only HTML sanitizer
+    types.ts, utils.ts
+firestore.rules                    Firestore security rules
+firestore.indexes.json             composite indexes
+storage.rules                      Cloud Storage rules (caps message image uploads)
+firebase.json                      firebase deploy config
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Setup
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### 1. Install
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+pnpm install   # or npm install / yarn
+```
 
-## Learn More
+### 2. Create a Firebase project
 
-To learn more about Next.js, take a look at the following resources:
+1. Create a project at <https://console.firebase.google.com>.
+2. **Authentication** → enable **Email/Password** and **Google** providers.
+3. **Firestore** → create a database (production mode is fine — we ship rules).
+4. **Project settings** → **General** → add a Web app and copy the config
+   keys. These map to the `NEXT_PUBLIC_FIREBASE_*` env vars.
+5. **Project settings** → **Service accounts** → "Generate new private key".
+   Use the resulting JSON to populate `FIREBASE_ADMIN_*` env vars.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### 3. Configure env
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+cp .env.example .env.local
+# fill in values
+```
 
-## Deploy on Vercel
+Required vars (see `.env.example` for the complete list):
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+| Var | Purpose |
+|---|---|
+| `NEXT_PUBLIC_FIREBASE_*` | Web SDK config (incl. `STORAGE_BUCKET` for inline message images) |
+| `FIREBASE_ADMIN_PROJECT_ID/CLIENT_EMAIL/PRIVATE_KEY` | Server-only — verifies Firebase ID tokens & writes messages |
+| `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` | From <https://cloud.walletconnect.com> (free) |
+| `ETH_RPC_URL` / `SOL_RPC_URL` | Optional — server-side RPC for tx verification (public RPCs are rate-limited) |
+| `NEXT_PUBLIC_ETH_RPC_URL` / `NEXT_PUBLIC_SOL_RPC_URL` | Optional — used by the wallet connectors in the browser |
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### 4. Deploy Firestore rules + indexes + Storage rules
+
+```bash
+npm i -g firebase-tools
+firebase login
+firebase use --add        # pick the project
+firebase deploy --only firestore:rules,firestore:indexes,storage
+```
+
+Make sure **Cloud Storage** is enabled in the Firebase console (Build →
+Storage → Get started). The default `<project-id>.appspot.com` bucket is
+what `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET` points at, and senders upload
+inline images there under `message-images/<uid>/...`.
+
+### 5. Run
+
+```bash
+pnpm dev
+```
+
+Open <http://localhost:3000>.
+
+## Deploying
+
+We deploy the Next.js app on **Vercel** and use **Firebase** for storage only
+(Auth + Firestore + optional Storage). The two halves talk over HTTPS — there
+is no Firebase Hosting / App Hosting in the path.
+
+### 1. Push to GitHub and import in Vercel
+
+1. Push this repo to GitHub.
+2. Go to <https://vercel.com/new> → Import the repo.
+3. Framework preset: **Next.js** (auto-detected).
+4. Build/output settings: leave the defaults. Install command can stay as
+   `pnpm install` (Vercel detects `pnpm-lock.yaml`).
+5. Don't deploy yet — set env vars first (next step).
+
+### 2. Configure env vars in the Vercel project
+
+In **Settings → Environment Variables**, add every var from `.env.example`,
+scoped to **Production** *and* **Preview** (and **Development** if you'll use
+`vercel env pull` locally).
+
+| Var | Notes |
+|---|---|
+| `NEXT_PUBLIC_FIREBASE_*` | Web SDK config from Firebase Console → Project settings → General. Public; baked into the client bundle. |
+| `FIREBASE_ADMIN_PROJECT_ID` | Same project ID. |
+| `FIREBASE_ADMIN_CLIENT_EMAIL` | From the service-account JSON. |
+| `FIREBASE_ADMIN_PRIVATE_KEY` | Paste the full multi-line PEM, including `-----BEGIN/END PRIVATE KEY-----` and the `\n` sequences. The runtime expands `\n` back to real newlines. |
+| `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` | From <https://cloud.walletconnect.com>. |
+| `ETH_RPC_URL` / `SOL_RPC_URL` | Server-side RPCs used by `/api/messages/send` for tx verification. Optional but strongly recommended (public RPCs rate-limit). |
+| `NEXT_PUBLIC_ETH_RPC_URL` / `NEXT_PUBLIC_SOL_RPC_URL` | Browser-side RPCs for wallet connectors. Optional. |
+
+### 3. Authorize the Vercel domain in Firebase Auth
+
+Firebase Auth blocks sign-in from any domain not on its allow-list.
+
+**Firebase Console → Authentication → Settings → Authorized domains → Add
+domain**, and add:
+
+- `your-project.vercel.app` (the Vercel-issued URL).
+- Your custom domain if you have one (e.g. `paytochat.fun`, plus `www.paytochat.fun`). You can add this before DNS is wired.
+
+`localhost` and `*.firebaseapp.com` are already there.
+
+> Keep `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` set to the Firebase-issued
+> `*.firebaseapp.com` value — *not* your Vercel/custom domain. That's a
+> Firebase Auth thing and unrelated to where the app is hosted.
+
+### 4. Deploy
+
+Click **Deploy** in Vercel. Subsequent pushes to your default branch auto-
+deploy; PR branches get preview URLs. To deploy from your laptop:
+
+```bash
+pnpm dlx vercel link        # one-time: connect this folder to the Vercel project
+pnpm dlx vercel --prod      # deploys current working tree
+pnpm dlx vercel env pull    # syncs prod env vars into .env.local
+```
+
+### 5. Custom domain on Vercel
+
+In Vercel: **Project → Settings → Domains → Add**. Type `paytochat.fun` (and
+add a redirect from `www`). Vercel shows the DNS records to set at your
+registrar — typically:
+
+| Type | Name | Value |
+|---|---|---|
+| `A` | `@` | `76.76.21.21` |
+| `CNAME` | `www` | `cname.vercel-dns.com` |
+
+If your registrar is Cloudflare, gray-cloud the records during provisioning so
+Vercel's ACME challenge isn't blocked. Vercel issues SSL automatically once DNS
+resolves; status flips to **Valid Configuration**, usually in minutes.
+
+After the domain is live, **make sure you also added it to Firebase Auth's
+Authorized domains list** (step 3) — otherwise Google sign-in on the new
+domain silently fails.
+
+### 6. Deploy Firestore rules + indexes (+ Storage rules) from your laptop
+
+This stays on the Firebase side and is independent of Vercel:
+
+```bash
+npm i -g firebase-tools
+firebase login
+firebase use --add                                              # link the Firebase project
+firebase deploy --only firestore:rules,firestore:indexes        # always run after rules/index changes
+firebase deploy --only storage                                  # if you change storage.rules
+```
+
+### 7. Other production checklist items
+
+- **WalletConnect allowlist** — in the WalletConnect Cloud dashboard, add your
+  Vercel preview URL and your custom domain to the project's allowed origins.
+- **Vercel function region** — defaults to US East (iad1). If your Firestore
+  is in a different region you can override in **Settings → Functions** to
+  cut latency on `/api/messages/*`.
+- **Service account permissions** — the Admin SDK only needs Firestore + Auth
+  IAM roles (`roles/datastore.user`, `roles/firebaseauth.admin`). Don't give
+  it Owner.
+
+## How payment & verification works
+
+1. Sender writes a message and chooses chain + token + amount.
+2. Sender's connected wallet signs an ERC-20 (Ethereum) or SPL (Solana)
+   `transfer` directly to the recipient's wallet address from their profile.
+3. Once the tx is confirmed, the client posts `{recipientHandle, body, chain,
+   token, txHash, amountUSD, fromAddress}` + the user's Firebase ID token to
+   `POST /api/messages/send`.
+4. The server (Admin SDK) verifies the ID token, looks up the recipient,
+   refuses below-threshold tips, fetches the on-chain transaction via RPC and
+   confirms:
+   - Transaction succeeded.
+   - There's a `Transfer` log on the right token contract / SPL mint.
+   - Recipient address matches the recipient's configured wallet.
+   - Amount ≥ requested amount.
+   - The same tx hash hasn't been used to unlock a different message.
+5. On success, the message is written with `status: "paid"`, the conversation
+   is updated, the recipient's earned-USD stat increments.
+6. When the recipient swipes right, `POST /api/messages/open` flips
+   `status: "opened"`, sets `coolOffUntil = now + N days` on the
+   conversation, and decrements the unread counter.
+7. Future messages from the same sender during cool-off (or in a free chat)
+   pass `free: true` and skip the payment requirement.
+
+We never hold the funds. The recipient's wallet receives the transfer
+directly.
+
+## What the auto-DM feature actually does
+
+Real auto-replies on X or Instagram require OAuth and are subject to those
+platforms' Developer Terms. This v1 ships a **copy-paste generator**:
+
+- Customize a templated reply in **Settings → DM auto-reply**.
+- One-click copy of the reply with your handle interpolated.
+- One-click copy of your `paytochat.fun/<handle>` link.
+- A "Tweet it" deep-link.
+
+A future webhook integration could automate this for verified developer
+accounts.
+
+## Security notes
+
+- Firestore rules deny all message writes from clients — only the
+  Admin-SDK-backed API routes can create messages, which guarantees a
+  payment was verified before the message exists.
+- Message bodies are sanitized server-side (`sanitize-html`) before being
+  persisted. Only a small allowlist of tags / attributes survives, every
+  link is forced to `target="_blank" rel="noopener noreferrer nofollow"`,
+  and only `http(s):` and `mailto:` schemes are kept.
+- Storage rules restrict inline image uploads to the authenticated sender's
+  own `message-images/<uid>/...` folder, cap each file at 8 MB, and allow
+  only common image MIME types.
+- Handles must be 3–24 chars `[a-z0-9_]`. A small set of route-collision
+  names (`api`, `app`, `admin`, `www`, …) is reserved.
+- Recipients can only update their own conversation `isFree` and
+  `unreadCount` fields; nothing else.
+- The user document `handle` and `handleLower` are immutable after creation
+  (rules enforce this) so handles can't be hijacked.
+- Same `txHash` cannot be reused for a second message (server-side check).
+- Min-threshold is enforced server-side, not just in UI.
+
+## What's next (not in v1)
+
+- Email / push notifications above the notify threshold (Firebase Cloud
+  Messaging or Resend webhook).
+- Refund-on-skip: today, swiping left does not refund the sender. A
+  Solana-Pay-style escrow would let recipients refund un-opened messages.
+- Native auto-DM via X / Instagram OAuth.
+- Custom on-chain memo encoding the message id so verification doesn't need
+  a separate API round-trip.
+
+## License
+
+MIT.

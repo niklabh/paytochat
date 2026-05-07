@@ -3,25 +3,157 @@
 @tailwind utilities;
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #0b0a14;
+  --foreground: #ededf0;
+  --surface: #14131f;
+  --muted: #8a87a0;
+  --border: #25243a;
+  --accent: #7c5cff;
+  --accent-foreground: #ffffff;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html,
+body {
+  background: var(--background);
+  color: var(--foreground);
 }
 
 body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+  background:
+    radial-gradient(1200px 600px at 80% -10%, rgba(124, 92, 255, 0.18), transparent 60%),
+    radial-gradient(900px 500px at -10% 30%, rgba(0, 200, 200, 0.12), transparent 60%),
+    var(--background);
+  min-height: 100vh;
 }
 
 @layer utilities {
   .text-balance {
     text-wrap: balance;
   }
+  .glass {
+    background: rgba(20, 19, 31, 0.6);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+  }
+  .gradient-text {
+    background: linear-gradient(135deg, #c9b8ff 0%, #7c5cff 50%, #00e0d0 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* RainbowKit z-index fix on mobile dialog */
+[data-rk] {
+  --rk-fonts-body: var(--font-geist-sans);
+}
+
+/*
+ * Rich-text styles, shared by the Tiptap editor (.tiptap) and the rendered
+ * message body (.prose-message). Keep them lean so messages feel native
+ * inside the dark cards.
+ */
+.prose-message {
+  line-height: 1.55;
+  word-break: break-word;
+}
+.prose-message p {
+  margin: 0 0 0.75rem;
+}
+.prose-message p:last-child {
+  margin-bottom: 0;
+}
+.prose-message h2 {
+  font-size: 1.15rem;
+  font-weight: 700;
+  margin: 1rem 0 0.5rem;
+  letter-spacing: -0.01em;
+}
+.prose-message h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0.875rem 0 0.4rem;
+}
+.prose-message strong {
+  font-weight: 700;
+  color: #f5f4ff;
+}
+.prose-message em {
+  font-style: italic;
+}
+.prose-message a {
+  color: #c9b8ff;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 3px;
+}
+.prose-message ul,
+.prose-message ol {
+  margin: 0 0 0.75rem;
+  padding-left: 1.4rem;
+}
+.prose-message ul {
+  list-style: disc;
+}
+.prose-message ol {
+  list-style: decimal;
+}
+.prose-message li > p {
+  margin: 0;
+}
+.prose-message blockquote {
+  border-left: 3px solid rgba(124, 92, 255, 0.6);
+  padding: 0.1rem 0 0.1rem 0.85rem;
+  color: var(--muted);
+  margin: 0.75rem 0;
+  font-style: italic;
+}
+.prose-message code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 0.05rem 0.35rem;
+  border-radius: 0.35rem;
+  font-size: 0.85em;
+}
+.prose-message img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.85rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  margin: 0.75rem 0;
+  max-height: 420px;
+  object-fit: contain;
+  background: rgba(255, 255, 255, 0.04);
+}
+.prose-message hr {
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  margin: 1rem 0;
+}
+
+/* Tiptap-only tweaks */
+.tiptap.ProseMirror {
+  outline: none;
+}
+.tiptap p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: var(--muted);
+  pointer-events: none;
+  height: 0;
 }
