@@ -6,10 +6,18 @@ import { useAuth } from "@/lib/auth-context";
 import { Button } from "./ui";
 import { Logo } from "./logo";
 import { cn } from "@/lib/utils";
-import { Inbox, Send, Settings, LogOut, User as UserIcon } from "lucide-react";
+import {
+  Inbox,
+  MessageSquare,
+  Send,
+  Settings,
+  LogOut,
+  User as UserIcon,
+} from "lucide-react";
 
 const tabs = [
   { href: "/a/dashboard", label: "Inbox", Icon: Inbox },
+  { href: "/a/dashboard/chats", label: "Chats", Icon: MessageSquare },
   { href: "/a/dashboard/sent", label: "Sent", Icon: Send },
   { href: "/a/dashboard/settings", label: "Settings", Icon: Settings },
 ];
@@ -43,6 +51,16 @@ export function MarketingNav() {
   );
 }
 
+function isTabActive(pathname: string | null, href: string): boolean {
+  if (!pathname) return false;
+  if (pathname === href) return true;
+  // Thread routes (`/a/dashboard/c/<convId>`) belong to the Chats tab.
+  if (href === "/a/dashboard/chats" && pathname.startsWith("/a/dashboard/c/")) {
+    return true;
+  }
+  return false;
+}
+
 export function AppNav() {
   const pathname = usePathname();
   const { profile, signOutUser } = useAuth();
@@ -61,7 +79,7 @@ export function AppNav() {
                 href={href}
                 className={cn(
                   "inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm transition-colors",
-                  pathname === href
+                  isTabActive(pathname, href)
                     ? "bg-white/10 text-foreground"
                     : "text-muted hover:text-foreground hover:bg-white/5"
                 )}
@@ -94,14 +112,14 @@ export function AppNav() {
 
       {/* Bottom mobile nav */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-30 backdrop-blur-md bg-background/80 border-t border-white/5">
-        <div className="grid grid-cols-3">
+        <div className="grid grid-cols-4">
           {tabs.map(({ href, label, Icon }) => (
             <Link
               key={href}
               href={href}
               className={cn(
                 "flex flex-col items-center justify-center gap-0.5 py-2.5 text-xs",
-                pathname === href ? "text-brand-300" : "text-muted"
+                isTabActive(pathname, href) ? "text-brand-300" : "text-muted"
               )}
             >
               <Icon size={20} />

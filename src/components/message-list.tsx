@@ -1,7 +1,17 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
-import { Coins, Eye, ImageIcon, Lock, Send, Wallet, X } from "lucide-react";
+import {
+  Coins,
+  Eye,
+  ImageIcon,
+  Lock,
+  MessageSquare,
+  Send,
+  Wallet,
+  X,
+} from "lucide-react";
 import type { MessageDoc } from "@/lib/types";
 import { Badge, Button } from "./ui";
 import { RichContent } from "./rich-content";
@@ -178,17 +188,27 @@ function OpenedBody({
           {message.body}
         </p>
       )}
-      {isOpened && !isFree && (
-        <div className="mt-3 inline-flex items-center gap-2 rounded-lg bg-emerald-500/10 border border-emerald-500/30 px-3 py-1.5 text-xs">
-          <Coins size={12} className="text-emerald-300" />
-          <span className="text-emerald-200 font-semibold">
-            {formatUSD(message.amountUSD)}
-          </span>
-          <span className="text-muted">
-            in {message.token} on {message.chain}
-          </span>
-        </div>
-      )}
+      <div className="mt-3 flex items-center justify-between gap-2 flex-wrap">
+        {isOpened && !isFree ? (
+          <div className="inline-flex items-center gap-2 rounded-lg bg-emerald-500/10 border border-emerald-500/30 px-3 py-1.5 text-xs">
+            <Coins size={12} className="text-emerald-300" />
+            <span className="text-emerald-200 font-semibold">
+              {formatUSD(message.amountUSD)}
+            </span>
+            <span className="text-muted">
+              in {message.token} on {message.chain}
+            </span>
+          </div>
+        ) : (
+          <span />
+        )}
+        <Link
+          href={`/a/dashboard/c/${encodeURIComponent(message.conversationId)}`}
+          className="inline-flex items-center gap-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 px-3 py-1.5 text-xs text-foreground transition-colors"
+        >
+          <MessageSquare size={12} /> Reply in chat
+        </Link>
+      </div>
     </>
   );
 }

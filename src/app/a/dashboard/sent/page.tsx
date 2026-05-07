@@ -1,12 +1,20 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { collection, onSnapshot, orderBy, query, where } from "firebase/firestore";
 import { useAuth } from "@/lib/auth-context";
 import { db, firebaseConfigured } from "@/lib/firebase/client";
 import type { MessageDoc } from "@/lib/types";
 import { Card, Badge } from "@/components/ui";
-import { Check, CheckCheck, Coins, ImageIcon, Loader2 } from "lucide-react";
+import {
+  Check,
+  CheckCheck,
+  Coins,
+  ImageIcon,
+  Loader2,
+  MessageSquare,
+} from "lucide-react";
 import { formatUSD, timeAgo } from "@/lib/utils";
 import { htmlToPlainText } from "@/lib/rich-text";
 
@@ -38,40 +46,51 @@ export default function SentPage() {
         </Card>
       )}
       {messages.map((m) => (
-        <Card key={m.id} className="!p-4">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-full bg-gradient-to-tr from-brand-500 to-brand-300 flex items-center justify-center text-white font-bold">
-              {m.recipientHandle.slice(0, 1).toUpperCase()}
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <div className="font-semibold truncate">@{m.recipientHandle}</div>
-                <span className="text-xs text-muted">{timeAgo(toMs(m.createdAt))}</span>
+        <Link
+          key={m.id}
+          href={`/a/dashboard/c/${encodeURIComponent(m.conversationId)}`}
+          className="block"
+        >
+          <Card className="!p-4 hover:bg-white/[.06] transition-colors">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-full bg-gradient-to-tr from-brand-500 to-brand-300 flex items-center justify-center text-white font-bold">
+                {m.recipientHandle.slice(0, 1).toUpperCase()}
               </div>
-              <div className="text-sm text-muted truncate flex items-center gap-1.5">
-                {/<img[\s>]/i.test(m.body || "") && (
-                  <ImageIcon size={12} className="shrink-0 text-brand-200" />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <div className="font-semibold truncate">@{m.recipientHandle}</div>
+                  <span className="text-xs text-muted">
+                    {timeAgo(toMs(m.createdAt))}
+                  </span>
+                </div>
+                <div className="text-sm text-muted truncate flex items-center gap-1.5">
+                  {/<img[\s>]/i.test(m.body || "") && (
+                    <ImageIcon size={12} className="shrink-0 text-brand-200" />
+                  )}
+                  <span className="truncate">
+                    {m.bodyPlain || htmlToPlainText(m.body || "")}
+                  </span>
+                </div>
+              </div>
+              <div className="text-right text-xs shrink-0">
+                {m.amountUSD > 0 ? (
+                  <span className="inline-flex items-center gap-1 text-emerald-300">
+                    <Coins size={12} /> {formatUSD(m.amountUSD)}
+                  </span>
+                ) : (
+                  <Badge>free</Badge>
                 )}
-                <span className="truncate">
-                  {m.bodyPlain || htmlToPlainText(m.body || "")}
-                </span>
+                <div className="mt-1 flex items-center justify-end gap-1 text-muted">
+                  <StatusIcon status={m.status} />
+                  {labelFor(m.status)}
+                </div>
+                <div className="mt-1.5 inline-flex items-center gap-1 text-muted/80 hover:text-foreground">
+                  <MessageSquare size={11} /> chat
+                </div>
               </div>
             </div>
-            <div className="text-right text-xs">
-              {m.amountUSD > 0 ? (
-                <span className="inline-flex items-center gap-1 text-emerald-300">
-                  <Coins size={12} /> {formatUSD(m.amountUSD)}
-                </span>
-              ) : (
-                <Badge>free</Badge>
-              )}
-              <div className="mt-1 flex items-center justify-end gap-1 text-muted">
-                <StatusIcon status={m.status} />
-                {labelFor(m.status)}
-              </div>
-            </div>
-          </div>
-        </Card>
+          </Card>
+        </Link>
       ))}
     </div>
   );

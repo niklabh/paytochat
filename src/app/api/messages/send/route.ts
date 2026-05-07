@@ -32,6 +32,13 @@ function conversationId(a: string, b: string) {
   return [a, b].sort().join("_");
 }
 
+class DuplicateTxError extends Error {
+  constructor() {
+    super("Transaction has already been used for another message.");
+    this.name = "DuplicateTxError";
+  }
+}
+
 export async function POST(req: Request) {
   let payload: z.infer<typeof Body>;
   try {
@@ -177,22 +184,15 @@ export async function POST(req: Request) {
     txHash = payload.txHash;
     fromAddress = verify.fromAddress;
     toAddress = verify.toAddress || recipAddress;
-
-    // Reject duplicate tx hashes (one tx unlocks one message).
-    const dupQuery = await db
-      .collection("messages")
-      .where("txHash", "==", txHash)
-      .limit(1)
-      .get();
-    if (!dupQuery.empty) {
-      return NextResponse.json(
-        { error: "This transaction has already been used for another message." },
-        { status: 409 }
-      );
-    }
   }
 
-  const messageRef = db.collection("messages").doc();
+  // Use the txHash as the message doc ID for paid messages so duplicate-tx
+  // attempts collide on a single document and are caught atomically by the
+  // tx.get() guard below. Free messages keep an auto-generated ID.
+  const messageRef =
+    status === "paid" && txHash
+      ? db.collection("messages").doc(txHash)
+      : db.collection("messages").doc();
   const message = {
     id: messageRef.id,
     conversationId: convId,
@@ -235,23 +235,36 @@ export async function POST(req: Request) {
     unreadCount: updatedUnread,
   };
 
-  await db.runTransaction(async (tx) => {
-    tx.set(messageRef, message);
-    tx.set(convRef, convUpdate, { merge: true });
-    if (status === "paid") {
-      tx.set(
-        db.collection("users").doc(recipient.uid),
-        {
-          stats: {
-            totalEarnedUSD: (recipient.stats?.totalEarnedUSD || 0) + amountUSD,
-            messagesReceived: (recipient.stats?.messagesReceived || 0) + 1,
-            messagesOpened: recipient.stats?.messagesOpened || 0,
-          },
-        },
-        { merge: true }
+  try {
+    await db.runTransaction(async (tx) => {
+      // Reads first (Admin SDK requires reads-before-writes). For paid
+      // messages, this also locks the message doc on its txHash-derived ID,
+      // so two concurrent sends with the same txHash cannot both commit.
+      if (status === "paid") {
+        const existing = await tx.get(messageRef);
+        if (existing.exists) {
+          throw new DuplicateTxError();
+        }
+      }
+
+      tx.set(messageRef, message);
+      tx.set(convRef, convUpdate, { merge: true });
+      if (status === "paid") {
+        tx.update(db.collection("users").doc(recipient.uid), {
+          "stats.totalEarnedUSD": FieldValue.increment(amountUSD),
+          "stats.messagesReceived": FieldValue.increment(1),
+        });
+      }
+    });
+  } catch (err) {
+    if (err instanceof DuplicateTxError) {
+      return NextResponse.json(
+        { error: "This transaction has already been used for another message." },
+        { status: 409 }
       );
     }
-  });
+    throw err;
+  }
 
   // Best-effort: email the recipient. Never block the response on this.
   void notifyRecipientByEmail({

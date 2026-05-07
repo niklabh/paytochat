@@ -36,6 +36,35 @@ export function timeAgo(date: Date | number): string {
   return `${Math.floor(mon / 12)}y ago`;
 }
 
+/**
+ * Coerces a Firestore Timestamp / number / null into a millisecond epoch,
+ * with a fallback when the value is missing (e.g. server-stamped fields
+ * still pending on the snapshot we just emitted).
+ */
+export function toMs(
+  t: number | { toMillis?: () => number } | null | undefined,
+  fallback = Date.now()
+): number {
+  if (t == null) return fallback;
+  if (typeof t === "number") return t;
+  if (typeof t.toMillis === "function") return t.toMillis();
+  return fallback;
+}
+
+/** Formats `ms` (a future millisecond delta) as `1d 2h`, `45m`, `15s`, or `now`. */
+export function formatCountdown(ms: number): string {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  if (s <= 0) return "now";
+  const d = Math.floor(s / 86400);
+  const h = Math.floor((s % 86400) / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  if (d > 0) return h > 0 ? `${d}d ${h}h` : `${d}d`;
+  if (h > 0) return m > 0 ? `${h}h ${m}m` : `${h}h`;
+  if (m > 0) return `${m}m`;
+  return `${sec}s`;
+}
+
 export function slugifyHandle(input: string): string {
   return input
     .toLowerCase()
