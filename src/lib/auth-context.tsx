@@ -17,10 +17,28 @@ import {
   updateProfile,
   type User,
 } from "firebase/auth";
-import { doc, onSnapshot, runTransaction, serverTimestamp } from "firebase/firestore";
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  limit,
+  onSnapshot,
+  query,
+  runTransaction,
+  serverTimestamp,
+  where,
+} from "firebase/firestore";
 import { auth, db, firebaseConfigured, googleProvider } from "./firebase/client";
 import { DEFAULT_USER_SETTINGS, type UserDoc } from "./types";
 import { isValidHandle, slugifyHandle } from "./utils";
+
+export class HandleTakenError extends Error {
+  constructor() {
+    super("HANDLE_TAKEN");
+    this.name = "HandleTakenError";
+  }
+}
 
 interface AuthCtx {
   loading: boolean;
@@ -31,6 +49,12 @@ interface AuthCtx {
   signUpEmail: (email: string, password: string, handle: string, displayName: string) => Promise<void>;
   signInGoogle: () => Promise<void>;
   signOutUser: () => Promise<void>;
+  /**
+   * Creates the Firestore profile for the currently signed-in user with the
+   * chosen handle. Used by the post-Google-sign-in onboarding flow. Throws
+   * `HandleTakenError` if another user already owns the handle.
+   */
+  claimHandle: (handle: string, displayName: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthCtx | null>(null);
@@ -95,16 +119,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     const unsub = onAuthStateChanged(auth, async (u) => {
       setUser(u);
+      // Reset profile up front so that switching users (or signing out) can't
+      // briefly leak the previous user's profile into the UI.
+      setProfile(null);
       if (!u) {
-        setProfile(null);
         setLoading(false);
         return;
       }
       const pending = pendingSignUp.current;
       try {
-        await ensureUserDoc(u, pending?.handle, pending?.displayName);
+        const ref = doc(db, "users", u.uid);
+        const snap = await getDoc(ref);
+        if (snap.exists()) {
+          // Existing user — the onSnapshot subscription below will keep state
+          // in sync. Seed it now so consumers don't see a null-profile flash.
+          setProfile(snap.data() as UserDoc);
+        } else if (pending) {
+          // Email signup path: signUpEmail set this with the handle the user
+          // just picked.
+          await ensureUserDoc(u, pending.handle, pending.displayName);
+        }
+        // Otherwise (e.g. brand-new Google user): leave profile as null so the
+        // UI can route them to /a/onboarding to claim a handle.
       } catch (e) {
-        console.error("ensureUserDoc failed", e);
+        console.error("auth bootstrap failed", e);
       }
       setLoading(false);
     });
@@ -150,11 +188,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     },
     async signInGoogle() {
-      const cred = await signInWithPopup(auth, googleProvider);
-      await ensureUserDoc(cred.user);
+      // Don't auto-create a profile here. The auth-state listener decides:
+      // if no Firestore profile exists yet, the UI routes the user through
+      // /a/onboarding to claim a handle.
+      await signInWithPopup(auth, googleProvider);
     },
     async signOutUser() {
       await signOut(auth);
+    },
+    async claimHandle(handle, displayName) {
+      const u = auth.currentUser;
+      if (!u) throw new Error("Not signed in");
+      if (!isValidHandle(handle)) throw new Error("Invalid handle");
+
+      // Best-effort uniqueness check. The Firestore rules don't enforce
+      // cross-user uniqueness on `handleLower`, so two parallel claims could
+      // still race. The first to commit "wins" the public profile lookup
+      // (which uses .limit(1)); the loser would need to pick another handle
+      // from settings. Acceptable for now.
+      const q = query(
+        collection(db, "users"),
+        where("handleLower", "==", handle.toLowerCase()),
+        limit(1)
+      );
+      const existing = await getDocs(q);
+      if (!existing.empty && existing.docs[0].id !== u.uid) {
+        throw new HandleTakenError();
+      }
+
+      if (displayName && u.displayName !== displayName) {
+        try {
+          await updateProfile(u, { displayName });
+        } catch {
+          // Non-fatal: the Firestore doc is the source of truth for display.
+        }
+      }
+      await ensureUserDoc(u, handle, displayName || handle);
     },
   };
 

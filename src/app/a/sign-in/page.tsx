@@ -10,15 +10,19 @@ import { toast } from "sonner";
 import { FirebaseError } from "firebase/app";
 
 export default function SignInPage() {
-  const { signInEmail, signInGoogle, user, configured } = useAuth();
+  const { signInEmail, signInGoogle, user, profile, loading, configured } = useAuth();
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
 
+  // Wait for the auth listener to finish bootstrapping the profile before
+  // deciding where to send the user. New Google users won't have a profile
+  // yet and need to go through /a/onboarding to pick a handle.
   useEffect(() => {
-    if (user) router.replace("/a/dashboard");
-  }, [user, router]);
+    if (loading || !user) return;
+    router.replace(profile ? "/a/dashboard" : "/a/onboarding");
+  }, [loading, user, profile, router]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -29,7 +33,7 @@ export default function SignInPage() {
     setBusy(true);
     try {
       await signInEmail(email, password);
-      router.replace("/a/dashboard");
+      // The redirect effect above handles routing once auth state settles.
     } catch (e: unknown) {
       const code = e instanceof FirebaseError ? e.code : "";
       toast.error(code || "Could not sign in.");
@@ -46,7 +50,8 @@ export default function SignInPage() {
     setBusy(true);
     try {
       await signInGoogle();
-      router.replace("/a/dashboard");
+      // The redirect effect above handles routing — including sending brand-
+      // new Google users to /a/onboarding to claim a handle.
     } catch (e: unknown) {
       const code = e instanceof FirebaseError ? e.code : "";
       toast.error(code || "Google sign-in failed.");
