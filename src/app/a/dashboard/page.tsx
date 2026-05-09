@@ -16,9 +16,7 @@ import { Card } from "@/components/ui";
 import { ArrowUpRight, Coins, Inbox } from "lucide-react";
 import Link from "next/link";
 import { cn, formatUSD } from "@/lib/utils";
-import { toast } from "sonner";
 import { MessageList, WalletNote } from "@/components/message-list";
-import { TipRevealConfetti } from "@/components/tip-reveal-confetti";
 
 type Filter = "all" | "unread" | "opened";
 
@@ -33,17 +31,16 @@ export default function DashboardPage() {
   const [messages, setMessages] = useState<MessageDoc[]>([]);
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState<Filter>("all");
-  const [confetti, setConfetti] = useState<{
-    trigger: number;
-    amountLabel?: string;
-  } | null>(null);
 
   useEffect(() => {
     if (!user || !firebaseConfigured) return;
+    // Inbox shows paid messages only — the locked, unopened ones plus the
+    // ones already revealed. Free in-thread replies live inside the thread
+    // view, not the top-level inbox.
     const q = query(
       collection(db, "messages"),
       where("recipientId", "==", user.uid),
-      where("status", "in", ["paid", "free", "opened"]),
+      where("status", "in", ["paid", "opened"]),
       orderBy("createdAt", "desc"),
       limit(50)
     );
@@ -66,9 +63,7 @@ export default function DashboardPage() {
     return {
       all: visible.length,
       unread: visible.filter((m) => m.status === "paid").length,
-      opened: visible.filter(
-        (m) => m.status === "opened" || m.status === "free"
-      ).length,
+      opened: visible.filter((m) => m.status === "opened").length,
     };
   }, [messages, hidden]);
 
@@ -76,40 +71,10 @@ export default function DashboardPage() {
     return messages.filter((m) => {
       if (hidden.has(m.id)) return false;
       if (filter === "unread") return m.status === "paid";
-      if (filter === "opened")
-        return m.status === "opened" || m.status === "free";
+      if (filter === "opened") return m.status === "opened";
       return true;
     });
   }, [messages, hidden, filter]);
-
-  async function handleOpen(messageId: string) {
-    if (!user) return;
-    const target = messages.find((m) => m.id === messageId);
-    const wasPaid = target?.status === "paid" && (target.amountUSD ?? 0) > 0;
-    try {
-      const idToken = await user.getIdToken();
-      const res = await fetch("/api/messages/open", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${idToken}`,
-        },
-        body: JSON.stringify({ messageId }),
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Could not open.");
-      }
-      if (wasPaid && target) {
-        setConfetti({
-          trigger: Date.now(),
-          amountLabel: formatUSD(target.amountUSD),
-        });
-      }
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Open failed.");
-    }
-  }
 
   function handleArchive(messageId: string) {
     setHidden((s) => new Set(s).add(messageId));
@@ -121,10 +86,6 @@ export default function DashboardPage() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
-      <TipRevealConfetti
-        trigger={confetti?.trigger ?? null}
-        amountLabel={confetti?.amountLabel}
-      />
       {profile && (
         <div className="grid grid-cols-3 gap-3">
           <StatCard
@@ -171,11 +132,7 @@ export default function DashboardPage() {
         <FilterTabs filter={filter} onChange={setFilter} counts={counts} />
       </div>
 
-      <MessageList
-        messages={visible}
-        onOpen={handleOpen}
-        onArchive={handleArchive}
-      />
+      <MessageList messages={visible} onArchive={handleArchive} />
 
       {visible.length === 0 && counts.all > 0 && (
         <div className="text-center text-sm text-muted">

@@ -11,15 +11,10 @@ import { toast } from "sonner";
 interface ThreadComposerProps {
   /** Handle of the other participant — what we'll POST as `recipientHandle`. */
   recipientHandle: string;
-  /**
-   * `true` while the conversation is in cool-off, free chat, or otherwise
-   * eligible for a free reply.
-   */
+  /** `true` while the conversation is inside an active cool-off window. */
   canSendFree: boolean;
   /** Future epoch ms when the cool-off ends, or `null` if not in cool-off. */
   coolOffUntilMs: number | null;
-  /** Permanent free-chat flag — bypasses cool-off entirely. */
-  isFreeChat: boolean;
   /** Called after a successful send so the thread can scroll to bottom. */
   onSent?: () => void;
 }
@@ -28,16 +23,15 @@ const MAX_PLAIN_LENGTH = 2000;
 
 /**
  * Chat-style composer used inside a thread. While the conversation is in
- * cool-off (or marked as a free chat) it sends free messages via the
- * existing `/api/messages/send` endpoint. Once cool-off expires it
- * collapses to a CTA pointing at the recipient's public page so the sender
- * has to attach a fresh paid message to revive the thread.
+ * cool-off it sends free messages via the existing `/api/messages/send`
+ * endpoint. Once the cool-off expires it collapses to a CTA pointing at
+ * the recipient's public page so the sender has to attach a fresh paid
+ * message to revive the thread.
  */
 export function ThreadComposer({
   recipientHandle,
   canSendFree,
   coolOffUntilMs,
-  isFreeChat,
   onSent,
 }: ThreadComposerProps) {
   const { user } = useAuth();
@@ -141,9 +135,7 @@ export function ThreadComposer({
       </div>
       <div className="flex items-center justify-between gap-2 px-1.5 pt-1.5 text-[11px] text-muted">
         <div>
-          {isFreeChat ? (
-            <span className="text-emerald-300">Free chat — replies are always free.</span>
-          ) : remaining ? (
+          {remaining ? (
             <>
               Free reply window — <span className="text-foreground">{remaining}</span> left.
             </>

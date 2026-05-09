@@ -92,8 +92,8 @@ export default function LandingPage() {
           />
           <Feature
             Icon={Zap}
-            title="Cool-off & free chats"
-            body="When someone pays once, they unlock a 24-hour free reply window — your call to extend it. Mark a thread as a free chat any time and it stops costing them."
+            title="Cool-off reply window"
+            body="Every paid message unlocks a 24-hour window where both sides can reply free in the thread. Once it closes, a fresh paid message reopens the chat — so the meter only runs at the start of each conversation."
           />
           <Feature
             Icon={ShieldCheck}

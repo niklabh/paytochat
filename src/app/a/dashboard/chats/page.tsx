@@ -77,8 +77,9 @@ export default function ChatsPage() {
           <h3 className="text-base font-semibold">No chats yet</h3>
           <p className="mt-1 text-sm text-muted max-w-xs mx-auto">
             When someone pays to message you (or you pay them), the thread
-            shows up here. Free replies are open for the cool-off window after
-            each paid message.
+            shows up here. Both sides can reply free for the cool-off
+            window after each paid message — then a fresh paid message is
+            needed to reopen the thread.
           </p>
         </Card>
       ) : (
@@ -106,11 +107,6 @@ export default function ChatsPage() {
                     <span className="font-semibold truncate">
                       @{c.otherHandle ?? "unknown"}
                     </span>
-                    {c.isFree && (
-                      <span className="rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-200 text-[10px] font-medium px-1.5 py-px">
-                        free
-                      </span>
-                    )}
                     <span className="ml-auto text-[11px] text-muted shrink-0">
                       {timeAgo(toMs(c.lastMessageAt))}
                     </span>
@@ -124,7 +120,7 @@ export default function ChatsPage() {
                         <Coins size={10} /> {formatUSD(c.totalPaidUSD)}
                       </span>
                     )}
-                    {c.isFree ? null : c.inCoolOff ? (
+                    {c.inCoolOff ? (
                       <span className="inline-flex items-center gap-1 rounded-full bg-brand-500/10 border border-brand-500/20 text-brand-200 px-1.5 py-px">
                         free reply · {formatCountdown(c.coolOffMs - now)}
                       </span>

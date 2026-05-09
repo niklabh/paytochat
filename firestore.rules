@@ -42,7 +42,11 @@ service cloud.firestore {
     }
 
     // Conversations: participants can read. Participants may update only
-    // these fields: isFree, unreadCount.<theirUid>. The server owns the rest.
+    // `unreadCount` (so the recipient can decrement their own counter when
+    // reading messages). Everything else — `coolOffUntil`, `lastMessageAt`,
+    // `totalPaidUSD`, etc. — is server-owned. There is no permanent
+    // free-chat flag; free replies are gated by `coolOffUntil`, which only
+    // the server (Admin SDK) can write.
     match /conversations/{convId} {
       allow read: if signedIn() && request.auth.uid in resource.data.participants;
 
@@ -52,7 +56,7 @@ service cloud.firestore {
         && request.auth.uid in resource.data.participants
         && request.resource.data.diff(resource.data)
             .affectedKeys()
-            .hasOnly(['isFree', 'unreadCount']);
+            .hasOnly(['unreadCount']);
 
       allow delete: if false;
     }

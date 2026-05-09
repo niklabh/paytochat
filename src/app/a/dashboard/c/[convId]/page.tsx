@@ -135,7 +135,7 @@ export default function ThreadPage({
 
   const coolOffMs = conv?.coolOffUntil ? toMs(conv.coolOffUntil, 0) : 0;
   const inCoolOff = coolOffMs > now;
-  const canSendFree = Boolean(conv?.isFree) || inCoolOff;
+  const canSendFree = inCoolOff;
 
   async function autoOpen(message: MessageDoc) {
     if (!user) return;
@@ -197,7 +197,6 @@ export default function ThreadPage({
 
       <ThreadHeader
         otherHandle={otherHandle}
-        isFree={conv.isFree}
         inCoolOff={inCoolOff}
         coolOffMs={coolOffMs}
         now={now}
@@ -228,7 +227,6 @@ export default function ThreadPage({
             recipientHandle={otherHandle}
             canSendFree={canSendFree}
             coolOffUntilMs={coolOffMs || null}
-            isFreeChat={conv.isFree}
           />
         )}
       </div>
@@ -238,14 +236,12 @@ export default function ThreadPage({
 
 function ThreadHeader({
   otherHandle,
-  isFree,
   inCoolOff,
   coolOffMs,
   now,
   totalPaidUSD,
 }: {
   otherHandle: string | undefined;
-  isFree: boolean;
   inCoolOff: boolean;
   coolOffMs: number;
   now: number;
@@ -271,16 +267,9 @@ function ThreadHeader({
           >
             @{otherHandle ?? "—"}
           </Link>
-          {isFree && (
-            <span className="rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-200 text-[10px] font-medium px-2 py-0.5">
-              free chat
-            </span>
-          )}
         </div>
         <div className="text-xs text-muted truncate">
-          {isFree ? (
-            <>Always free between you two</>
-          ) : inCoolOff ? (
+          {inCoolOff ? (
             <>
               Free reply window —{" "}
               <span className="text-foreground">
@@ -289,7 +278,7 @@ function ThreadHeader({
               left
             </>
           ) : (
-            <>Cool-off ended — paid messages required</>
+            <>Cool-off ended — a fresh paid message reopens the thread</>
           )}
         </div>
       </div>
@@ -351,7 +340,7 @@ function ChatBubble({
           )}
           {isFreeMsg && (
             <span className="ml-1 inline-flex items-center gap-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-200 px-1.5 py-px">
-              free
+              free reply
             </span>
           )}
           {message.status === "paid" && mine && (

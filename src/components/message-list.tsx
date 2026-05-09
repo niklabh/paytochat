@@ -1,10 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import {
   Coins,
-  Eye,
   ImageIcon,
   Lock,
   MessageSquare,
@@ -13,70 +12,51 @@ import {
   X,
 } from "lucide-react";
 import type { MessageDoc } from "@/lib/types";
-import { Badge, Button } from "./ui";
+import { Badge } from "./ui";
 import { RichContent } from "./rich-content";
 import { formatUSD, timeAgo } from "@/lib/utils";
 import { htmlToPlainText, isHtmlBody } from "@/lib/rich-text";
 
-type RowAction = (id: string) => void;
-
 interface MessageListProps {
   messages: MessageDoc[];
-  onOpen: RowAction;
-  onArchive: RowAction;
+  onArchive: (id: string) => void;
 }
 
-export function MessageList({ messages, onOpen, onArchive }: MessageListProps) {
+export function MessageList({ messages, onArchive }: MessageListProps) {
   if (messages.length === 0) return <EmptyInbox />;
   return (
     <div className="space-y-2.5">
       {messages.map((m) => (
-        <MessageRow
-          key={m.id}
-          message={m}
-          onOpen={onOpen}
-          onArchive={onArchive}
-        />
+        <MessageRow key={m.id} message={m} onArchive={onArchive} />
       ))}
     </div>
   );
 }
 
+/**
+ * Inbox row. The whole card is a link to the thread — the thread page
+ * handles the actual reveal (including the confetti animation) when the
+ * recipient lands on it. Locked messages still render a blurred preview
+ * here so the inbox feels alive.
+ */
 function MessageRow({
   message,
-  onOpen,
   onArchive,
 }: {
   message: MessageDoc;
-  onOpen: RowAction;
-  onArchive: RowAction;
+  onArchive: (id: string) => void;
 }) {
-  const [opening, setOpening] = useState(false);
   const isLocked = message.status === "paid";
-  const isFree = message.status === "free";
-  const isOpened = message.status === "opened";
-
-  async function reveal() {
-    if (opening) return;
-    setOpening(true);
-    try {
-      await onOpen(message.id);
-    } finally {
-      // The message doc will flip to "opened" via the listener; reset local
-      // state so a re-render with new props starts fresh.
-      setOpening(false);
-    }
-  }
+  const href = `/a/dashboard/c/${encodeURIComponent(message.conversationId)}`;
 
   return (
-    <div
+    <Link
+      href={href}
       className={[
-        "rounded-2xl border p-4 transition-colors",
+        "block rounded-2xl border p-4 transition-colors",
         isLocked
           ? "border-white/10 bg-white/[.04] hover:bg-white/[.06]"
-          : isFree
-          ? "border-emerald-500/20 bg-emerald-500/[.04]"
-          : "border-emerald-500/15 bg-emerald-500/[.03]",
+          : "border-emerald-500/15 bg-emerald-500/[.03] hover:bg-emerald-500/[.05]",
       ].join(" ")}
     >
       <div className="flex items-start gap-3">
@@ -96,7 +76,12 @@ function MessageRow({
             </div>
             <RowBadge status={message.status} amountUSD={message.amountUSD} />
             <button
-              onClick={() => onArchive(message.id)}
+              onClick={(e) => {
+                // Stop the click from bubbling up to the Link wrapper.
+                e.preventDefault();
+                e.stopPropagation();
+                onArchive(message.id);
+              }}
               title="Hide"
               className="text-muted hover:text-foreground p-1 rounded-md hover:bg-white/10 transition-colors"
             >
@@ -105,29 +90,17 @@ function MessageRow({
           </div>
 
           {isLocked ? (
-            <LockedBody
-              message={message}
-              onReveal={reveal}
-              opening={opening}
-            />
+            <LockedPreview message={message} />
           ) : (
-            <OpenedBody message={message} isFree={isFree} isOpened={isOpened} />
+            <OpenedPreview message={message} />
           )}
         </div>
       </div>
-    </div>
+    </Link>
   );
 }
 
-function LockedBody({
-  message,
-  onReveal,
-  opening,
-}: {
-  message: MessageDoc;
-  onReveal: () => void;
-  opening: boolean;
-}) {
+function LockedPreview({ message }: { message: MessageDoc }) {
   const preview = useMemo(() => {
     const plain = message.bodyPlain || htmlToPlainText(message.body || "");
     return plain || "•••••••••••••••••••••••••••••••••••••••••";
@@ -156,29 +129,15 @@ function LockedBody({
             </span>
           )}
         </div>
-        <Button onClick={onReveal} size="sm" disabled={opening}>
-          {opening ? (
-            "Revealing…"
-          ) : (
-            <>
-              <Eye size={14} /> Reveal & open
-            </>
-          )}
-        </Button>
+        <span className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-tr from-brand-500 to-brand-300 text-white text-xs font-medium px-2.5 py-1.5">
+          <MessageSquare size={12} /> Open thread
+        </span>
       </div>
     </>
   );
 }
 
-function OpenedBody({
-  message,
-  isFree,
-  isOpened,
-}: {
-  message: MessageDoc;
-  isFree: boolean;
-  isOpened: boolean;
-}) {
+function OpenedPreview({ message }: { message: MessageDoc }) {
   return (
     <>
       {isHtmlBody(message.body) ? (
@@ -189,25 +148,18 @@ function OpenedBody({
         </p>
       )}
       <div className="mt-3 flex items-center justify-between gap-2 flex-wrap">
-        {isOpened && !isFree ? (
-          <div className="inline-flex items-center gap-2 rounded-lg bg-emerald-500/10 border border-emerald-500/30 px-3 py-1.5 text-xs">
-            <Coins size={12} className="text-emerald-300" />
-            <span className="text-emerald-200 font-semibold">
-              {formatUSD(message.amountUSD)}
-            </span>
-            <span className="text-muted">
-              in {message.token} on {message.chain}
-            </span>
-          </div>
-        ) : (
-          <span />
-        )}
-        <Link
-          href={`/a/dashboard/c/${encodeURIComponent(message.conversationId)}`}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 px-3 py-1.5 text-xs text-foreground transition-colors"
-        >
-          <MessageSquare size={12} /> Reply in chat
-        </Link>
+        <div className="inline-flex items-center gap-2 rounded-lg bg-emerald-500/10 border border-emerald-500/30 px-3 py-1.5 text-xs">
+          <Coins size={12} className="text-emerald-300" />
+          <span className="text-emerald-200 font-semibold">
+            {formatUSD(message.amountUSD)}
+          </span>
+          <span className="text-muted">
+            in {message.token} on {message.chain}
+          </span>
+        </div>
+        <span className="inline-flex items-center gap-1.5 rounded-lg bg-white/5 border border-white/10 px-3 py-1.5 text-xs text-foreground">
+          <MessageSquare size={12} /> Open thread
+        </span>
       </div>
     </>
   );
@@ -224,13 +176,6 @@ function RowBadge({
     return (
       <Badge className="bg-brand-500/15 border-brand-500/30 text-brand-200 whitespace-nowrap">
         <Lock size={10} /> paid
-      </Badge>
-    );
-  }
-  if (status === "free") {
-    return (
-      <Badge className="bg-emerald-500/15 border-emerald-500/30 text-emerald-200 whitespace-nowrap">
-        free
       </Badge>
     );
   }

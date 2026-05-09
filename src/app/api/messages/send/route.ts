@@ -24,7 +24,7 @@ const Body = z.object({
   txHash: z.string().optional(),
   amountUSD: z.number().nonnegative().optional(),
   fromAddress: z.string().optional(),
-  /** When the sender wants to claim a free message during cool-off / free chat. */
+  /** Sender claims a free reply inside an active cool-off window. */
   free: z.boolean().optional(),
 });
 
@@ -108,13 +108,15 @@ export async function POST(req: Request) {
 
   const nowMs = Date.now();
   const inCoolOff =
-    conv?.coolOffUntil &&
+    !!conv?.coolOffUntil &&
     (typeof conv.coolOffUntil === "number"
       ? conv.coolOffUntil > nowMs
       : (conv.coolOffUntil as Timestamp).toMillis() > nowMs);
-  const isFreeChat = conv?.isFree === true;
 
-  const isFreeMessage = payload.free === true && (inCoolOff || isFreeChat);
+  // Free replies are only allowed inside an active cool-off window. There
+  // is no permanent free-chat flag any more — once cool-off ends the
+  // sender must pay again to reopen the thread.
+  const isFreeMessage = payload.free === true && inCoolOff;
   let status: MessageStatus = "pending";
   let amountUSD = 0;
   let chain: Chain | undefined;
@@ -229,7 +231,6 @@ export async function POST(req: Request) {
     participantHandles: [sender.handle, recipient.handle].sort(),
     lastMessageAt: FieldValue.serverTimestamp(),
     lastMessagePreview: status === "paid" ? "paid message" : bodyPlain.slice(0, 80),
-    isFree: conv?.isFree ?? false,
     coolOffUntil: conv?.coolOffUntil ?? null,
     totalPaidUSD: (conv?.totalPaidUSD || 0) + amountUSD,
     unreadCount: updatedUnread,
@@ -266,14 +267,16 @@ export async function POST(req: Request) {
     throw err;
   }
 
-  // Best-effort: email the recipient. Never block the response on this.
-  void notifyRecipientByEmail({
-    recipient,
-    sender,
-    amountUSD,
-    isFree: status === "free",
-    preview: bodyPlain,
-  });
+  // Best-effort: email the recipient on paid messages only. Free replies
+  // (cool-off chatter) never trigger emails — that's a spam vector and
+  // the recipient is presumably already engaged in the thread.
+  if (status === "paid") {
+    void notifyRecipientByEmail({
+      recipient,
+      sender,
+      amountUSD,
+    });
+  }
 
   return NextResponse.json({
     ok: true,
@@ -284,26 +287,25 @@ export async function POST(req: Request) {
 }
 
 /**
- * Fire-and-forget recipient email notification. Honours the user's
- * `emailNotifications` toggle and `notifyThresholdUSD` (paid messages only).
- * Errors are swallowed and logged; this must never break the send flow.
+ * Fire-and-forget paid-message email notification. Honours the user's
+ * `emailNotifications` toggle and `notifyThresholdUSD`. The email itself
+ * does NOT include the message body or the tip amount — the recipient has
+ * to open the inbox to learn either, which keeps the "amount stays hidden
+ * until you reveal" promise even when the notification is intercepted
+ * (e.g. shoulder-surfed on a lock-screen preview).
  */
 async function notifyRecipientByEmail(args: {
   recipient: UserDoc;
   sender: UserDoc;
   amountUSD: number;
-  isFree: boolean;
-  preview: string;
 }): Promise<void> {
   try {
-    const { recipient, sender, amountUSD, isFree, preview } = args;
+    const { recipient, sender, amountUSD } = args;
 
     if (recipient.settings?.emailNotifications === false) return;
 
-    // For paid messages, only ping when the tip clears the user's threshold.
-    // Free / cool-off messages always notify (subject to the master toggle).
     const notifyThreshold = recipient.settings?.notifyThresholdUSD ?? 0;
-    if (!isFree && amountUSD < notifyThreshold) return;
+    if (amountUSD < notifyThreshold) return;
 
     const authUser = await adminAuth().getUser(recipient.uid);
     const toEmail = authUser.email;
@@ -315,9 +317,6 @@ async function notifyRecipientByEmail(args: {
       recipientDisplayName: recipient.displayName,
       senderHandle: sender.handle,
       senderDisplayName: sender.displayName,
-      preview,
-      amountUSD,
-      isFree,
     });
   } catch (err) {
     console.error("[notifyRecipientByEmail] failed", err);

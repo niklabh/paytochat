@@ -35,14 +35,15 @@ export interface NewMessageEmailInput {
   recipientDisplayName?: string;
   senderHandle: string;
   senderDisplayName?: string;
-  preview: string;
-  amountUSD: number;
-  isFree: boolean;
 }
 
 /**
- * Send a "you got a new message" email via SendGrid. Best-effort: returns
- * `false` (and logs) on misconfig or API errors so callers can fire-and-forget.
+ * Send a "you got paid" notification via SendGrid. Intentionally minimal —
+ * no message body, no tip amount, no preview. The whole point of Pay to
+ * Chat is that the amount stays hidden until the recipient reveals it in
+ * the inbox; leaking either through email would defeat that. Best-effort:
+ * returns `false` (and logs) on misconfig or API errors so callers can
+ * fire-and-forget.
  */
 export async function sendNewMessageEmail(
   input: NewMessageEmailInput
@@ -68,19 +69,7 @@ export async function sendNewMessageEmail(
   const inboxUrl = `${appUrl()}/a/dashboard`;
   const settingsUrl = `${appUrl()}/a/dashboard/settings`;
 
-  const amountLabel = input.isFree
-    ? "free message"
-    : `$${input.amountUSD.toFixed(2)} message`;
-
-  const subject = input.isFree
-    ? `New free message from @${input.senderHandle}`
-    : `@${input.senderHandle} sent you a $${input.amountUSD.toFixed(2)} message`;
-
-  const previewSafe = escapeHtml(
-    input.preview.length > 240
-      ? `${input.preview.slice(0, 240).trimEnd()}…`
-      : input.preview
-  );
+  const subject = `You got a paid message from @${input.senderHandle}`;
 
   const html = `
 <!doctype html>
@@ -94,14 +83,14 @@ export async function sendNewMessageEmail(
               <td>
                 <p style="margin:0 0 8px 0;font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:#9ca3af;">Pay to Chat</p>
                 <h1 style="margin:0 0 16px 0;font-size:22px;line-height:1.3;color:#ffffff;">
-                  Hey ${escapeHtml(recipientName)}, you got a new ${escapeHtml(amountLabel)}.
+                  Hey ${escapeHtml(recipientName)}, you got paid.
                 </h1>
-                <p style="margin:0 0 20px 0;font-size:15px;line-height:1.5;color:#d1d5db;">
+                <p style="margin:0 0 24px 0;font-size:15px;line-height:1.5;color:#d1d5db;">
                   <strong style="color:#ffffff;">${escapeHtml(senderName)}</strong>
                   (<a href="${appUrl()}/${encodeURIComponent(input.senderHandle)}" style="color:#a78bfa;text-decoration:none;">@${escapeHtml(input.senderHandle)}</a>)
-                  sent you a message:
+                  just sent you a paid message. Open your inbox to see how much
+                  it's worth and read what they wrote.
                 </p>
-                <blockquote style="margin:0 0 24px 0;padding:14px 16px;border-left:3px solid #a78bfa;background:rgba(167,139,250,0.08);border-radius:8px;font-size:14px;line-height:1.5;color:#e7e7ee;white-space:pre-wrap;">${previewSafe}</blockquote>
                 <p style="margin:0 0 24px 0;">
                   <a href="${inboxUrl}" style="display:inline-block;background:linear-gradient(135deg,#a78bfa,#f472b6);color:#0b0b10;font-weight:600;text-decoration:none;padding:12px 22px;border-radius:12px;font-size:14px;">Open inbox</a>
                 </p>
@@ -121,11 +110,9 @@ export async function sendNewMessageEmail(
   const text = [
     `Hey ${recipientName},`,
     "",
-    `You got a new ${amountLabel} from @${input.senderHandle} (${senderName}):`,
-    "",
-    input.preview,
-    "",
-    `Open it: ${inboxUrl}`,
+    `@${input.senderHandle} (${senderName}) just sent you a paid message.`,
+    "Open your inbox to see how much it's worth and read what they wrote:",
+    inboxUrl,
     "",
     `Turn off email notifications: ${settingsUrl}`,
   ].join("\n");

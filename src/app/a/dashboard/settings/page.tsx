@@ -1,14 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { doc, updateDoc, collection, onSnapshot, query, where, orderBy } from "firebase/firestore";
+import { doc, updateDoc } from "firebase/firestore";
 import { useAuth } from "@/lib/auth-context";
-import { db, firebaseConfigured } from "@/lib/firebase/client";
-import { Button, Card, Input, Label, Switch, Badge } from "@/components/ui";
+import { db } from "@/lib/firebase/client";
+import { Button, Card, Input, Label, Switch } from "@/components/ui";
 import { toast } from "sonner";
 import { Copy, ExternalLink, Save, Check } from "lucide-react";
-import type { Chain, Token, ConversationDoc } from "@/lib/types";
-import Link from "next/link";
+import type { Chain, Token } from "@/lib/types";
 
 export default function SettingsPage() {
   const { user, profile } = useAuth();
@@ -203,8 +202,11 @@ export default function SettingsPage() {
       <Card>
         <h2 className="text-lg font-semibold">Notifications</h2>
         <p className="mt-1 text-sm text-muted">
-          Get an email when a new message lands in your inbox. Paid messages
-          still respect the &ldquo;notify above&rdquo; threshold above.
+          Get an email whenever a paid message lands in your inbox. Subject
+          to the &ldquo;notify above&rdquo; threshold — free in-thread
+          replies never email. The email itself never includes the message
+          content or the tip amount; you have to open the inbox to see
+          either.
         </p>
         <div className="mt-4 flex items-center justify-between gap-4 rounded-xl bg-white/3 border border-white/5 px-3 py-3">
           <div className="min-w-0">
@@ -283,8 +285,6 @@ export default function SettingsPage() {
         </p>
       </Card>
 
-      <FreeChats />
-
       <div className="sticky bottom-20 md:bottom-4 flex justify-end">
         <Button onClick={save} disabled={busy} size="lg" className="shadow-lg">
           {busy ? "Saving…" : (
@@ -329,73 +329,5 @@ function CopyChip({ label, value }: { label: string; value: string }) {
     >
       {copied ? <Check size={12} /> : <Copy size={12} />} {label}
     </button>
-  );
-}
-
-function FreeChats() {
-  const { user } = useAuth();
-  const [convs, setConvs] = useState<ConversationDoc[]>([]);
-
-  useEffect(() => {
-    if (!user || !firebaseConfigured) return;
-    const q = query(
-      collection(db, "conversations"),
-      where("participants", "array-contains", user.uid),
-      orderBy("lastMessageAt", "desc")
-    );
-    const unsub = onSnapshot(q, (snap) => {
-      setConvs(snap.docs.map((d) => ({ ...(d.data() as ConversationDoc), id: d.id })));
-    });
-    return () => unsub();
-  }, [user]);
-
-  async function toggleFree(conv: ConversationDoc, isFree: boolean) {
-    await updateDoc(doc(db, "conversations", conv.id), { isFree });
-    toast.success(isFree ? "Now a free chat" : "Free chat off");
-  }
-
-  if (!user) return null;
-  return (
-    <Card>
-      <h2 className="text-lg font-semibold">Conversations</h2>
-      <p className="mt-1 text-sm text-muted">
-        Toggle a thread to free — that sender no longer needs to pay.
-      </p>
-      <div className="mt-4 space-y-2">
-        {convs.length === 0 && (
-          <div className="text-sm text-muted">No conversations yet.</div>
-        )}
-        {convs.map((c) => {
-          const otherIdx = c.participants[0] === user.uid ? 1 : 0;
-          const otherHandle = c.participantHandles?.[otherIdx];
-          return (
-            <div
-              key={c.id}
-              className="flex items-center justify-between gap-3 rounded-xl bg-white/3 hover:bg-white/5 transition-colors px-3 py-2 border border-white/5"
-            >
-              <div className="min-w-0 flex-1">
-                <Link
-                  href={`/${otherHandle}`}
-                  className="font-medium hover:underline"
-                >
-                  @{otherHandle}
-                </Link>
-                <div className="text-xs text-muted truncate">
-                  {c.lastMessagePreview || "—"}
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                {c.isFree && <Badge className="bg-emerald-500/15 border-emerald-500/30 text-emerald-200">free</Badge>}
-                <Switch
-                  checked={c.isFree}
-                  onChange={(v) => toggleFree(c, v)}
-                  label="free"
-                />
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </Card>
   );
 }

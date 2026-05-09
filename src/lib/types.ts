@@ -48,7 +48,7 @@ export type MessageStatus =
   | "paid" // tx confirmed, awaiting recipient open
   | "opened" // recipient revealed
   | "rejected" // below recipient threshold
-  | "free"; // sent during cool-off or in a free chat
+  | "free"; // free reply sent during the cool-off window
 
 export interface MessageDoc {
   id: string;
@@ -81,9 +81,11 @@ export interface ConversationDoc {
   participantHandles: [string, string];
   lastMessageAt: Timestamp | number;
   lastMessagePreview?: string;
-  /** If true, all future messages from sender are free. */
-  isFree: boolean;
-  /** Until this timestamp the sender can send messages free of charge. */
+  /**
+   * Until this timestamp either participant can send a free reply in the
+   * thread. Set on each paid open (`now + coolOffDays`) and re-extended by
+   * every subsequent paid open.
+   */
   coolOffUntil?: Timestamp | number;
   unreadCount: { [uid: string]: number };
   totalPaidUSD: number;

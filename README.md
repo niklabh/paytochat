@@ -29,9 +29,9 @@ reveal**. Stop ignoring DM requests; charge what your attention is worth.
   cool-off window closes; after that, the sender must attach a fresh paid
   message to reopen the thread.
 - **Cool-off window** — once someone pays, both sides unlock a free reply
-  window (default 24 h, configurable). Each new paid open extends it.
-- **Free chats** — flip any thread to free; that pair no longer needs to pay
-  ever again.
+  window (default 24 h, configurable). Each new paid open extends it. Once
+  it expires, the sender must attach a fresh paid message to reopen the
+  thread — there is no permanent free-chat escape hatch.
 - **Read receipts** — sender sees when their message was opened.
 - **Public profile** at `paytochat.fun/<handle>` for senders to land on.
 - **DM auto-reply generator** — copy-paste template for X / Instagram DM
@@ -66,10 +66,10 @@ src/
         chats/                     list of conversations + cool-off status
         c/[convId]/                live thread view (auto-reveal + chat composer)
         sent/                      sent messages with read receipts
-        settings/                  profile, wallets, thresholds, free chats, auto-reply
+        settings/                  profile, wallets, thresholds, auto-reply
     api/
       messages/send/route.ts       creates a message, verifies on-chain payment
-                                   (also handles free replies during cool-off / free chats)
+                                   (also handles free replies during the cool-off window)
       messages/open/route.ts       reveal a message, start cool-off, increment stats
     layout.tsx, providers.tsx, globals.css
   components/                      ui primitives, nav, swipe deck, rich editor + renderer
@@ -264,9 +264,11 @@ firebase deploy --only storage                                  # if you change 
 6. When the recipient swipes right, `POST /api/messages/open` flips
    `status: "opened"`, sets `coolOffUntil = now + N days` on the
    conversation, and decrements the unread counter.
-7. Future messages from either participant during cool-off (or in a free
-   chat) pass `free: true` and skip the payment requirement — this is what
-   powers the threaded chat experience.
+7. Future messages from either participant during the cool-off window
+   pass `free: true` and skip the payment requirement — this is what
+   powers the threaded chat experience. Once `coolOffUntil` has passed
+   the server rejects `free: true` requests, so the only way to keep the
+   thread open is another paid message.
 8. Each new paid open resets `coolOffUntil` to `now + N days`, so an active
    thread can keep extending itself as long as one side keeps paying.
 
@@ -300,8 +302,9 @@ accounts.
   only common image MIME types.
 - Handles must be 3–24 chars `[a-z0-9_]`. A small set of route-collision
   names (`api`, `app`, `admin`, `www`, …) is reserved.
-- Recipients can only update their own conversation `isFree` and
-  `unreadCount` fields; nothing else.
+- Participants can only update their own conversation `unreadCount`
+  field; nothing else. There is no client-writable free-chat flag — free
+  replies are gated solely by the server-managed `coolOffUntil` window.
 - The user document `handle` and `handleLower` are immutable after creation
   (rules enforce this) so handles can't be hijacked.
 - Same `txHash` cannot be reused for a second message (server-side check).
