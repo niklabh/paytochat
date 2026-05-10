@@ -19,6 +19,7 @@ import {
 } from "@solana/wallet-adapter-react";
 import { WalletModalProvider as SolanaModalProvider } from "@solana/wallet-adapter-react-ui";
 import { AuthProvider } from "@/lib/auth-context";
+import { AnalyticsTracker } from "@/components/analytics-tracker";
 
 const projectId =
   process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || "00000000000000000000000000000000";
@@ -85,7 +86,10 @@ export function Providers({ children }: { children: ReactNode }) {
           <ConnectionProvider endpoint={solanaEndpoint}>
             <SolanaWalletProvider wallets={[]} autoConnect>
               <SolanaModalProvider>
-                <AuthProvider>{children}</AuthProvider>
+                <AuthProvider>
+                  <AnalyticsTracker />
+                  {children}
+                </AuthProvider>
               </SolanaModalProvider>
             </SolanaWalletProvider>
           </ConnectionProvider>

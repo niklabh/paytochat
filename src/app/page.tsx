@@ -42,9 +42,6 @@ export default function LandingPage() {
             </Button>
           </Link>
         </div>
-        <p className="mt-4 text-xs text-muted">
-          Free to claim a handle. We never custody funds — payments go straight to your wallet.
-        </p>
         <div className="mt-6 flex justify-center">
           <a
             href="https://t.me/paytochat"
