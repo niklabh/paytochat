@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
 import "@rainbow-me/rainbowkit/styles.css";
@@ -22,6 +22,13 @@ export const metadata: Metadata = {
   description:
     "Get paid to read messages. Senders pay in USDC or USDT on Solana or Ethereum. The amount is hidden until you swipe to reveal.",
   metadataBase: new URL("https://paytochat.fun"),
+  manifest: "/manifest.webmanifest",
+  applicationName: "Pay to Chat",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Pay to Chat",
+  },
   openGraph: {
     title: "Pay to Chat",
     description:
@@ -35,6 +42,11 @@ export const metadata: Metadata = {
     title: "Pay to Chat",
     description: "Make people pay to land in your inbox.",
   },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#0b0b10",
+  colorScheme: "dark",
 };
 
 export default function RootLayout({

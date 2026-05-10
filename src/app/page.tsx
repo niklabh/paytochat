@@ -144,6 +144,15 @@ export default function LandingPage() {
           >
             <TelegramIcon className="h-4 w-4" /> @paytochat on Telegram
           </a>
+          <nav className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
+            <Link href="/terms" className="hover:text-foreground transition-colors">
+              Terms
+            </Link>
+            <span aria-hidden="true">·</span>
+            <Link href="/privacy" className="hover:text-foreground transition-colors">
+              Privacy
+            </Link>
+          </nav>
           <p>
             paytochat.fun · Built on Firebase, Solana &amp; Ethereum · Stablecoins are
             subject to issuer terms.

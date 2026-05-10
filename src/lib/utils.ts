@@ -75,6 +75,8 @@ export function slugifyHandle(input: string): string {
 // Names that collide with top-level app routes / static assets. The dynamic
 // `/[handle]` route lives at the root, so any handle equal to one of these
 // would never resolve to a profile page.
+// Handles use `[a-z0-9_]` so dashed route names (`apple-icon`, `icon-512`)
+// can never collide. Only reserve route names that match the handle regex.
 const RESERVED_HANDLES = new Set([
   "a",
   "api",
@@ -84,6 +86,10 @@ const RESERVED_HANDLES = new Set([
   "favicon",
   "robots",
   "sitemap",
+  "manifest",
+  "icon",
+  "terms",
+  "privacy",
   "_next",
 ]);
 
