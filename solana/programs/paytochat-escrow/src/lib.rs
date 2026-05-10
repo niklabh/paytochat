@@ -1,8 +1,8 @@
-// Anchor 0.30 + solana-program emit unexpected_cfgs warnings for internal
-// feature gates (`anchor-debug`, `custom-heap`, `custom-panic`, `solana`)
-// that aren't declared in our Cargo.toml. They're entirely cosmetic and
-// originate from upstream proc-macro expansions, so we silence them at the
-// crate level.
+// Anchor's proc-macros (and solana-program) reference internal feature
+// gates (`anchor-debug`, `custom-heap`, `custom-panic`, `solana`) that
+// aren't declared in our Cargo.toml. They're cosmetic, originate from
+// upstream macro expansions, and the warning persists on Anchor 0.32 +
+// rustc's stricter unexpected_cfgs lint, so we silence it crate-wide.
 #![allow(unexpected_cfgs)]
 
 //! Pay to Chat — SPL escrow program.
@@ -54,7 +54,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Mint, Token, TokenAccount, Transfer};
 
-declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
+declare_id!("EFfsYcyU8L6K7rKGW5wbwrn5EiVqhL6yyr6xBqxc3rwB");
 
 pub const MAX_FEE_BPS: u16 = 1_000;
 pub const BPS_DENOMINATOR: u64 = 10_000;

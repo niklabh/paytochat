@@ -87,28 +87,39 @@ solana/
 
 ## Setup (one-time)
 
-You need the Solana toolchain + Anchor + a recent Node.
+You need the Solana toolchain + Anchor + a recent Node. The official
+bundled installer at <https://solana.com/docs/intro/installation> ships
+all of them in one shot — Rust, Solana CLI (Agave), Anchor, Node, Yarn,
+Surfpool. The legacy `release.solana.com` URL is deprecated.
 
 ```bash
 # 1. Accept the macOS Xcode SDK license (only once per machine).
 sudo xcodebuild -license
 
-# 2. Solana CLI (Agave). Use whatever the docs currently recommend; the
-#    pinned-version installer below is stable enough for most use cases.
-sh -c "$(curl -sSfL https://release.solana.com/v1.18.26/install)"
-export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
-solana --version
+# 2. One-shot installer (Rust + Solana CLI + Anchor + Node + Yarn).
+curl --proto '=https' --tlsv1.2 -sSfL https://solana-install.solana.workers.dev | bash
 
-# 3. Anchor via avm.
-cargo install --git https://github.com/coral-xyz/anchor avm --locked --force
-avm install 0.30.1
-avm use 0.30.1
-anchor --version
+# Re-source your shell (or open a new one) so PATH picks up the new bins.
+exec $SHELL -l
 
-# 4. Node deps.
+# Solana installs under ~/.local/share/solana/...; if `solana` isn't on
+# PATH yet, add this to ~/.zshrc / ~/.bashrc:
+#   export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
+
+rustc --version && solana --version && anchor --version && node --version
+# Expected (May 2026):
+#   rustc 1.91+         solana-cli 3.x (Agave)
+#   anchor-cli 0.32.1   node v24.x
+
+# 3. Node deps for the test suite.
 cd solana
 npm install     # or yarn / pnpm
 ```
+
+The repo pins Anchor `0.32.1` in `Anchor.toml`. If you're switching
+between projects on different Anchor majors, install
+[`avm`](https://www.anchor-lang.com/docs/installation#installing-using-anchor-version-manager-avm-recommended)
+and `avm use 0.32.1` here.
 
 ## Build & test
 

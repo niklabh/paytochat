@@ -1,24 +1,24 @@
 [toolchain]
-anchor_version = "0.30.1"
+anchor_version = "0.32.1"
 
 [features]
 resolution = true
 skip-lint = false
 
-[programs.localnet]
-paytochat_escrow = "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS"
-
 [programs.devnet]
-paytochat_escrow = "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS"
+paytochat_escrow = "BBxr7wYZwBv8Kgjz9tmrDnJoSKJxRi28hCzd2cWXhxWj"
+
+[programs.localnet]
+paytochat_escrow = "EFfsYcyU8L6K7rKGW5wbwrn5EiVqhL6yyr6xBqxc3rwB"
 
 [programs.mainnet]
-paytochat_escrow = "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS"
+paytochat_escrow = "BBxr7wYZwBv8Kgjz9tmrDnJoSKJxRi28hCzd2cWXhxWj"
 
 [registry]
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "Localnet"
+cluster = "localnet"
 wallet = "~/.config/solana/id.json"
 
 [scripts]
