@@ -6,13 +6,13 @@ resolution = true
 skip-lint = false
 
 [programs.devnet]
-paytochat_escrow = "BBxr7wYZwBv8Kgjz9tmrDnJoSKJxRi28hCzd2cWXhxWj"
+paytochat_escrow = "EFfsYcyU8L6K7rKGW5wbwrn5EiVqhL6yyr6xBqxc3rwB"
 
 [programs.localnet]
 paytochat_escrow = "EFfsYcyU8L6K7rKGW5wbwrn5EiVqhL6yyr6xBqxc3rwB"
 
 [programs.mainnet]
-paytochat_escrow = "BBxr7wYZwBv8Kgjz9tmrDnJoSKJxRi28hCzd2cWXhxWj"
+paytochat_escrow = "EFfsYcyU8L6K7rKGW5wbwrn5EiVqhL6yyr6xBqxc3rwB"
 
 [registry]
 url = "https://api.apr.dev"

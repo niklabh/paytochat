@@ -145,7 +145,7 @@ describe("paytochat-escrow", () => {
   it("initialize sets admin + fee, rejects fee > MAX", async () => {
     await program.methods
       .initialize(admin.publicKey, FEE_BPS)
-      .accounts({
+      .accountsPartial({
         payer: provider.wallet.publicKey,
         config: configPda,
         vaultAuthority: vaultAuthorityPda,
@@ -168,7 +168,7 @@ describe("paytochat-escrow", () => {
     await expect(
       program.methods
         .setFeeBps(1001)
-        .accounts({ config: configPda, admin: admin.publicKey })
+        .accountsPartial({ config: configPda, admin: admin.publicKey })
         .signers([admin])
         .rpc(),
     ).to.be.rejectedWith(/FeeTooHigh/);
@@ -176,14 +176,14 @@ describe("paytochat-escrow", () => {
     await expect(
       program.methods
         .setFeeBps(100)
-        .accounts({ config: configPda, admin: attacker.publicKey })
+        .accountsPartial({ config: configPda, admin: attacker.publicKey })
         .signers([attacker])
         .rpc(),
     ).to.be.rejectedWith(/NotAdmin|has_one|Unknown/);
 
     await program.methods
       .setFeeBps(FEE_BPS)
-      .accounts({ config: configPda, admin: admin.publicKey })
+      .accountsPartial({ config: configPda, admin: admin.publicKey })
       .signers([admin])
       .rpc();
   });
@@ -191,7 +191,7 @@ describe("paytochat-escrow", () => {
   it("set_token_allowed creates TokenConfig + Vault and toggles allowance", async () => {
     await program.methods
       .setTokenAllowed(true)
-      .accounts({
+      .accountsPartial({
         config: configPda,
         admin: admin.publicKey,
         mint: usdc,
@@ -225,7 +225,7 @@ describe("paytochat-escrow", () => {
     const deadline = new BN(Math.floor(Date.now() / 1000) + 3600);
     await program.methods
       .deposit([...pid], new BN(ONE_USDC.toString()), deadline)
-      .accounts({
+      .accountsPartial({
         config: configPda,
         mint: usdc,
         tokenConfig: tokenConfigPda(usdc),
@@ -317,7 +317,7 @@ describe("paytochat-escrow", () => {
     const dl = new BN(Math.floor(Date.now() / 1000) + 600);
     await program.methods
       .deposit([...pid], new BN(ONE_USDC.toString()), dl)
-      .accounts({
+      .accountsPartial({
         config: configPda,
         mint: usdc,
         tokenConfig: tokenConfigPda(usdc),
@@ -338,7 +338,7 @@ describe("paytochat-escrow", () => {
     await expect(
       program.methods
         .deposit([...pid], new BN(ONE_USDC.toString()), dl)
-        .accounts({
+        .accountsPartial({
           config: configPda,
           mint: usdc,
           tokenConfig: tokenConfigPda(usdc),
@@ -365,7 +365,7 @@ describe("paytochat-escrow", () => {
     const dl = new BN(Math.floor(Date.now() / 1000) + 600);
     await program.methods
       .deposit([...pid], new BN(ONE_USDC.toString()), dl)
-      .accounts({
+      .accountsPartial({
         config: configPda,
         mint: usdc,
         tokenConfig: tokenConfigPda(usdc),
@@ -389,7 +389,7 @@ describe("paytochat-escrow", () => {
 
     await program.methods
       .claim([...pid])
-      .accounts({
+      .accountsPartial({
         config: configPda,
         tokenConfig: tokenConfigPda(usdc),
         payment: paymentPda(pid),
@@ -429,7 +429,7 @@ describe("paytochat-escrow", () => {
     const dl = new BN(Math.floor(Date.now() / 1000) + 600);
     await program.methods
       .deposit([...pid], new BN(ONE_USDC.toString()), dl)
-      .accounts({
+      .accountsPartial({
         config: configPda,
         mint: usdc,
         tokenConfig: tokenConfigPda(usdc),
@@ -448,7 +448,7 @@ describe("paytochat-escrow", () => {
     await expect(
       program.methods
         .claim([...pid])
-        .accounts({
+        .accountsPartial({
           config: configPda,
           tokenConfig: tokenConfigPda(usdc),
           payment: paymentPda(pid),
@@ -474,7 +474,7 @@ describe("paytochat-escrow", () => {
     const dl = new BN(Math.floor(Date.now() / 1000) + 2);
     await program.methods
       .deposit([...pid], new BN(ONE_USDC.toString()), dl)
-      .accounts({
+      .accountsPartial({
         config: configPda,
         mint: usdc,
         tokenConfig: tokenConfigPda(usdc),
@@ -494,7 +494,7 @@ describe("paytochat-escrow", () => {
     await expect(
       program.methods
         .refund([...pid])
-        .accounts({
+        .accountsPartial({
           config: configPda,
           payment: paymentPda(pid),
           vault: vaultPda(usdc),
@@ -514,7 +514,7 @@ describe("paytochat-escrow", () => {
 
     await program.methods
       .refund([...pid])
-      .accounts({
+      .accountsPartial({
         config: configPda,
         payment: paymentPda(pid),
         vault: vaultPda(usdc),
@@ -546,7 +546,7 @@ describe("paytochat-escrow", () => {
     const dl = new BN(Math.floor(Date.now() / 1000) + 600);
     await program.methods
       .deposit([...pid], new BN(ONE_USDC.toString()), dl)
-      .accounts({
+      .accountsPartial({
         config: configPda,
         mint: usdc,
         tokenConfig: tokenConfigPda(usdc),
@@ -564,7 +564,7 @@ describe("paytochat-escrow", () => {
 
     await program.methods
       .setPaused(true)
-      .accounts({ config: configPda, admin: admin.publicKey })
+      .accountsPartial({ config: configPda, admin: admin.publicKey })
       .signers([admin])
       .rpc();
 
@@ -573,7 +573,7 @@ describe("paytochat-escrow", () => {
     await expect(
       program.methods
         .deposit([...pidNew], new BN(ONE_USDC.toString()), dl)
-        .accounts({
+        .accountsPartial({
           config: configPda,
           mint: usdc,
           tokenConfig: tokenConfigPda(usdc),
@@ -593,7 +593,7 @@ describe("paytochat-escrow", () => {
     // Claim still works.
     await program.methods
       .claim([...pid])
-      .accounts({
+      .accountsPartial({
         config: configPda,
         tokenConfig: tokenConfigPda(usdc),
         payment: paymentPda(pid),
@@ -609,7 +609,7 @@ describe("paytochat-escrow", () => {
 
     await program.methods
       .setPaused(false)
-      .accounts({ config: configPda, admin: admin.publicKey })
+      .accountsPartial({ config: configPda, admin: admin.publicKey })
       .signers([admin])
       .rpc();
   });
@@ -624,7 +624,7 @@ describe("paytochat-escrow", () => {
     const dl = new BN(Math.floor(Date.now() / 1000) + 600);
     await program.methods
       .deposit([...pidPending], new BN(ONE_USDC.toString()), dl)
-      .accounts({
+      .accountsPartial({
         config: configPda,
         mint: usdc,
         tokenConfig: tokenConfigPda(usdc),
@@ -651,7 +651,7 @@ describe("paytochat-escrow", () => {
 
     await program.methods
       .withdrawFees()
-      .accounts({
+      .accountsPartial({
         config: configPda,
         admin: admin.publicKey,
         mint: usdc,
@@ -684,7 +684,7 @@ describe("paytochat-escrow", () => {
     await expect(
       program.methods
         .withdrawFees()
-        .accounts({
+        .accountsPartial({
           config: configPda,
           admin: admin.publicKey,
           mint: usdc,
@@ -706,7 +706,7 @@ describe("paytochat-escrow", () => {
   it("transfer_admin + accept_admin is a two-step (Ownable2Step parity)", async () => {
     await program.methods
       .transferAdmin(newAdmin.publicKey)
-      .accounts({ config: configPda, admin: admin.publicKey })
+      .accountsPartial({ config: configPda, admin: admin.publicKey })
       .signers([admin])
       .rpc();
 
@@ -718,14 +718,14 @@ describe("paytochat-escrow", () => {
     await expect(
       program.methods
         .acceptAdmin()
-        .accounts({ config: configPda, newAdmin: attacker.publicKey })
+        .accountsPartial({ config: configPda, newAdmin: attacker.publicKey })
         .signers([attacker])
         .rpc(),
     ).to.be.rejectedWith(/NotPendingAdmin/);
 
     await program.methods
       .acceptAdmin()
-      .accounts({ config: configPda, newAdmin: newAdmin.publicKey })
+      .accountsPartial({ config: configPda, newAdmin: newAdmin.publicKey })
       .signers([newAdmin])
       .rpc();
 
@@ -737,7 +737,7 @@ describe("paytochat-escrow", () => {
     await expect(
       program.methods
         .setFeeBps(123)
-        .accounts({ config: configPda, admin: admin.publicKey })
+        .accountsPartial({ config: configPda, admin: admin.publicKey })
         .signers([admin])
         .rpc(),
     ).to.be.rejected;
@@ -746,12 +746,12 @@ describe("paytochat-escrow", () => {
     // if the suite is re-ordered.
     await program.methods
       .transferAdmin(admin.publicKey)
-      .accounts({ config: configPda, admin: newAdmin.publicKey })
+      .accountsPartial({ config: configPda, admin: newAdmin.publicKey })
       .signers([newAdmin])
       .rpc();
     await program.methods
       .acceptAdmin()
-      .accounts({ config: configPda, newAdmin: admin.publicKey })
+      .accountsPartial({ config: configPda, newAdmin: admin.publicKey })
       .signers([admin])
       .rpc();
   });

@@ -10,7 +10,11 @@
     "test": "anchor test",
     "test:skip-build": "anchor test --skip-build",
     "deploy:devnet": "anchor deploy --provider.cluster devnet",
-    "deploy:mainnet": "anchor deploy --provider.cluster mainnet"
+    "deploy:mainnet": "anchor deploy --provider.cluster mainnet",
+    "initialize": "ts-node scripts/initialize.ts",
+    "set-token-allowed": "ts-node scripts/set-token-allowed.ts",
+    "export-idl": "ts-node scripts/export-idl.ts",
+    "initpaytochat": "ANCHOR_PROVIDER_URL=https://api.mainnet-beta.solana.com ANCHOR_WALLET=~/.config/solana/id.json ADMIN_PUBKEY=71Ph2eNyH7B4z2aPixtc4nYR3hfGFE7D6npNma7B3C5f FEE_BPS=100 ts-node scripts/initialize.ts"
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.32.1",
@@ -28,6 +32,7 @@
     "mocha": "^10.8.2",
     "prettier": "^3.4.2",
     "ts-mocha": "^10.0.0",
+    "ts-node": "^10.9.2",
     "typescript": "^5.7.2"
   }
 }

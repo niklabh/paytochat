@@ -11,5 +11,10 @@
     "skipLibCheck": true,
     "moduleResolution": "node"
   },
-  "include": ["tests/**/*.ts", "migrations/**/*.ts", "target/types/**/*.ts"]
+  "include": [
+    "tests/**/*.ts",
+    "scripts/**/*.ts",
+    "migrations/**/*.ts",
+    "target/types/**/*.ts"
+  ]
 }
