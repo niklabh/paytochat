@@ -45,6 +45,16 @@ export default function LandingPage() {
         <p className="mt-4 text-xs text-muted">
           Free to claim a handle. We never custody funds — payments go straight to your wallet.
         </p>
+        <div className="mt-6 flex justify-center">
+          <a
+            href="https://t.me/paytochat"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-muted hover:text-foreground hover:border-white/20 transition-colors"
+          >
+            <TelegramIcon className="h-3.5 w-3.5" /> Join the community on Telegram
+          </a>
+        </div>
       </section>
 
       {/* How it works */}
@@ -122,12 +132,35 @@ export default function LandingPage() {
       </section>
 
       <footer className="border-t border-white/5 py-8 text-center text-xs text-muted">
-        <p>
-          paytochat.fun · Built on Firebase, Solana &amp; Ethereum · Stablecoins are
-          subject to issuer terms.
-        </p>
+        <div className="flex flex-col items-center gap-3">
+          <a
+            href="https://t.me/paytochat"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 text-muted hover:text-foreground transition-colors"
+          >
+            <TelegramIcon className="h-4 w-4" /> @paytochat on Telegram
+          </a>
+          <p>
+            paytochat.fun · Built on Firebase, Solana &amp; Ethereum · Stablecoins are
+            subject to issuer terms.
+          </p>
+        </div>
       </footer>
     </main>
+  );
+}
+
+function TelegramIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      aria-hidden="true"
+      className={className}
+    >
+      <path d="M21.94 4.34a1.5 1.5 0 0 0-1.6-.23L2.9 11.3a1.2 1.2 0 0 0 .07 2.24l4.27 1.42 1.65 5.28a1 1 0 0 0 1.66.45l2.46-2.27 4.4 3.23a1.4 1.4 0 0 0 2.2-.84l3.04-14.78a1.5 1.5 0 0 0-.71-1.69ZM9.7 14.7l8.7-7.7-7.18 8.34a1 1 0 0 0-.25.55l-.36 2.4-.91-3.6Z" />
+    </svg>
   );
 }
 

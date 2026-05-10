@@ -1,11 +1,26 @@
 # Pay to Chat
 
-> Make people **pay** to land in your inbox.
+**Pay to Chat** is a web app at **[paytochat.fun](https://paytochat.fun)**
+that lets you charge people to send you a direct message. Senders attach
+USDC or USDT — on Solana or Ethereum — to a message and transfer it
+straight to your wallet. We never hold the funds.
 
-A web app at **[paytochat.fun](https://paytochat.fun)** where senders attach
-USDC or USDT (on Solana or Ethereum) to a message. The recipient sees a clean
-inbox of locked cards — the **tip amount stays hidden until they tap to
-reveal**. Stop ignoring DM requests; charge what your attention is worth.
+You see your inbox as a list of locked cards. The sender, their handle,
+and a preview are visible, but **the tip amount stays hidden until you
+tap to reveal**. Once revealed, the message opens and a free reply
+window unlocks for 24 hours so the two of you can chat without further
+payments. After the window closes, the sender has to attach a fresh
+paid message to reopen the thread.
+
+You set your own rules in settings: minimum tip, notify-me threshold,
+which chains and tokens you accept, and how long the cool-off window
+lasts. You also get a public landing page at
+**paytochat.fun/your-handle** to point people at from your X or
+Instagram bio, plus a built-in template generator for the "DM me here"
+auto-reply.
+
+Built for creators, founders, recruiters, and anyone tired of an inbox
+full of unpaid DM requests. Pay or be ignored.
 
 ## Features
 
