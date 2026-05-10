@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { MarketingNav } from "@/components/nav";
+import { TokenSection } from "@/components/token-section";
 import { Button } from "@/components/ui";
 import {
   Wallet,
@@ -113,6 +114,11 @@ export default function LandingPage() {
             body="The whole point: the recipient can't pre-judge by tip size. They have to read the message first. Then they swipe to learn what it was worth."
           />
         </div>
+      </section>
+
+      {/* $PTC Token */}
+      <section id="token" className="mx-auto max-w-6xl px-4 pb-24 scroll-mt-20">
+        <TokenSection />
       </section>
 
       {/* CTA */}

@@ -31,6 +31,12 @@ export function MarketingNav() {
           <Logo />
         </Link>
         <nav className="flex items-center gap-2">
+          <Link
+            href="/#token"
+            className="hidden sm:inline text-sm text-muted hover:text-foreground px-3 py-2"
+          >
+            $PTC
+          </Link>
           {user ? (
             <Link href="/a/dashboard">
               <Button size="sm">Open inbox</Button>
