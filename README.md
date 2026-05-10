@@ -84,6 +84,10 @@ firestore.rules                    Firestore security rules
 firestore.indexes.json             composite indexes
 storage.rules                      Cloud Storage rules (caps message image uploads)
 firebase.json                      firebase deploy config
+contracts/                         Solidity escrow smart contract (Hardhat project,
+                                   self-contained — see contracts/README.md)
+solana/                            Anchor program mirroring the Solidity escrow
+                                   for SPL tokens — see solana/README.md
 ```
 
 ## Setup
@@ -260,17 +264,33 @@ firebase deploy --only storage                                  # if you change 
    - Amount ≥ requested amount.
    - The same tx hash hasn't been used to unlock a different message.
 5. On success, the message is written with `status: "paid"`, the conversation
-   is updated, the recipient's earned-USD stat increments.
-6. When the recipient swipes right, `POST /api/messages/open` flips
-   `status: "opened"`, sets `coolOffUntil = now + N days` on the
-   conversation, and decrements the unread counter.
-7. Future messages from either participant during the cool-off window
-   pass `free: true` and skip the payment requirement — this is what
-   powers the threaded chat experience. Once `coolOffUntil` has passed
-   the server rejects `free: true` requests, so the only way to keep the
-   thread open is another paid message.
-8. Each new paid open resets `coolOffUntil` to `now + N days`, so an active
-   thread can keep extending itself as long as one side keeps paying.
+   row is updated, and the recipient's `messagesReceived` counter
+   increments. The `totalEarnedUSD` aggregate is **not** touched yet —
+   that happens on claim, so a recipient can never learn the amount before
+   they pull it on-chain.
+6. When the recipient hits "Reveal", `POST /api/messages/open` flips
+   `status: "opened"` and decrements the unread counter. The body is now
+   visible but the tip is still locked in escrow; the amount remains
+   hidden in the UI.
+7. The recipient pulls the tip with `claim()` on-chain. `POST
+   /api/messages/claim` verifies the tx, flips `status: "claimed"`,
+   credits `totalEarnedUSD`, and creates a `threads/{messageId}` doc
+   (one thread **per paid message**) with `expiresAt = now +
+   coolOffDays * 24h`. The server also stamps `threadId = messageId`
+   onto the anchor message so a single
+   `messages where threadId == X order by createdAt asc` query returns
+   the anchor + all free replies in the thread. The amount is only
+   surfaced in the UI once the thread doc exists.
+8. Free in-thread replies pass `free: true` plus the `threadId` they
+   belong to. `/api/messages/send` accepts them only while
+   `threads/{threadId}.expiresAt > now` and bumps `freeReplyCount` /
+   `lastMessageAt` on the thread. Outside that window the server
+   rejects free sends and the UI collapses the composer to a
+   contextual CTA (claim / waiting on claim / send a new paid message).
+9. Each paid message anchors **its own thread** with its own 1-day
+   window. Two paid messages between the same pair of users → two
+   separate threads, two separate URLs (`/a/dashboard/t/{messageId}`),
+   and two rows in the chats list.
 
 We never hold the funds. The recipient's wallet receives the transfer
 directly.
@@ -304,18 +324,62 @@ accounts.
   names (`api`, `app`, `admin`, `www`, …) is reserved.
 - Participants can only update their own conversation `unreadCount`
   field; nothing else. There is no client-writable free-chat flag — free
-  replies are gated solely by the server-managed `coolOffUntil` window.
+  replies are gated solely by the server-managed
+  `threads/{threadId}.expiresAt` window, which only opens after a
+  verified on-chain claim of the specific paid message that anchors
+  the thread.
 - The user document `handle` and `handleLower` are immutable after creation
   (rules enforce this) so handles can't be hijacked.
 - Same `txHash` cannot be reused for a second message (server-side check).
 - Min-threshold is enforced server-side, not just in UI.
 
+## On-chain escrow
+
+The escrow logic ships in two parallel implementations sharing the same
+flow and `payment_id`-keyed semantics, so the off-chain layer stays
+chain-agnostic:
+
+- **`contracts/`** — Solidity / Hardhat for EVM chains
+  (Ethereum mainnet + L2s like Base, Arbitrum, Optimism, Polygon).
+- **`solana/`** — Rust / Anchor program for Solana (SPL tokens
+  USDC / USDT).
+
+`contracts/` is a self-contained Hardhat project containing
+`PayToChatEscrow.sol` — a secure ERC-20 escrow that lets us upgrade the
+payment flow from "direct transfer" to:
+
+1. **Sender** approves the escrow and calls
+   `deposit(paymentId, recipient, token, amount, deadline)`.
+2. **Recipient** calls `claim(paymentId)` — receives `amount - fee`, the
+   contract retains the fee.
+3. **Sender** can `refund(paymentId)` once the deadline passes if the
+   recipient ignored the message.
+4. **Admin** sweeps accumulated fees with `withdrawFees(token, to)`.
+
+Hardened with OpenZeppelin's `SafeERC20`, `Ownable2Step`,
+`ReentrancyGuard`, and `Pausable`; fee is hard-capped at 10 % on-chain;
+admin can never withdraw user-escrowed principal. Build and test from
+inside `contracts/`:
+
+```bash
+cd contracts
+pnpm install
+pnpm test                # full test suite (happy paths + reverts + reentrancy)
+pnpm deploy:sepolia      # after filling in contracts/.env
+```
+
+See [`contracts/README.md`](./contracts/README.md) for the EVM contract's
+security model and [`solana/README.md`](./solana/README.md) for the
+Solana program's. The unified deployment guide is in
+[`DEPLOYMENT.md`](./DEPLOYMENT.md).
+
 ## What's next (not in v1)
 
 - Email / push notifications above the notify threshold (Firebase Cloud
   Messaging or Resend webhook).
-- Refund-on-skip: today, swiping left does not refund the sender. A
-  Solana-Pay-style escrow would let recipients refund un-opened messages.
+- Wire `src/lib/payments/client.ts` and `verify.ts` to the deployed
+  `PayToChatEscrow` contract so cool-off-window refunds replace today's
+  direct-transfer flow.
 - Native auto-DM via X / Instagram OAuth.
 - Custom on-chain memo encoding the message id so verification doesn't need
   a separate API round-trip.

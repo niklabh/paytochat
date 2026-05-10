@@ -1,8 +1,25 @@
 import "server-only";
-import { createPublicClient, http, getAddress } from "viem";
-import { mainnet } from "viem/chains";
+import {
+  createPublicClient,
+  http,
+  getAddress,
+  decodeEventLog,
+  type Abi,
+} from "viem";
+import {
+  mainnet,
+  sepolia,
+  base,
+  baseSepolia,
+  arbitrum,
+  optimism,
+  polygon,
+  type Chain as ViemChain,
+} from "viem/chains";
 import { Connection, PublicKey } from "@solana/web3.js";
 import { getToken } from "./tokens";
+import { getEscrowAddress } from "./escrow";
+import { escrowAbi } from "./escrow-abi";
 import type { Chain, Token } from "../types";
 
 export interface VerifyResult {
@@ -11,84 +28,274 @@ export interface VerifyResult {
   amountUSD?: number;
   fromAddress?: string;
   toAddress?: string;
+  /** UNIX seconds — only set on EVM escrow verifies, lifted from the Deposited event. */
+  escrowDeadline?: number;
 }
 
-const ETH_RPC =
-  process.env.ETH_RPC_URL || "https://ethereum-rpc.publicnode.com";
 const SOL_RPC =
   process.env.SOL_RPC_URL || "https://api.mainnet-beta.solana.com";
 
-/**
- * Verifies a USDC/USDT ERC-20 transfer on Ethereum mainnet.
- * Looks for a `Transfer(from, to, value)` log on the token contract that
- * matches the expected sender, recipient and minimum amount.
- */
-async function verifyEthereum({
-  txHash,
-  expectedTo,
-  expectedFrom,
-  token,
-  minAmountUSD,
-}: {
+/** chainId -> viem chain config + RPC URL. */
+const EVM_CHAINS: Record<number, { chain: ViemChain; rpc: string | undefined }> = {
+  1: { chain: mainnet, rpc: process.env.ETH_RPC_URL || "https://ethereum-rpc.publicnode.com" },
+  11155111: { chain: sepolia, rpc: process.env.SEPOLIA_RPC_URL || "https://sepolia.gateway.tenderly.co" },
+  8453: { chain: base, rpc: process.env.BASE_RPC_URL || "https://mainnet.base.org" },
+  84532: { chain: baseSepolia, rpc: process.env.BASE_SEPOLIA_RPC_URL || "https://sepolia.base.org" },
+  42161: { chain: arbitrum, rpc: process.env.ARBITRUM_RPC_URL || "https://arb1.arbitrum.io/rpc" },
+  10: { chain: optimism, rpc: process.env.OPTIMISM_RPC_URL || "https://mainnet.optimism.io" },
+  137: { chain: polygon, rpc: process.env.POLYGON_RPC_URL || "https://polygon-rpc.com" },
+};
+
+function evmClient(chainId: number) {
+  const cfg = EVM_CHAINS[chainId];
+  if (!cfg) throw new Error(`Unsupported EVM chainId: ${chainId}`);
+  return createPublicClient({ chain: cfg.chain, transport: http(cfg.rpc) });
+}
+
+/* ----------------------------------------------------------------------- */
+/* EVM — Deposited event verification                                      */
+/* ----------------------------------------------------------------------- */
+
+interface VerifyEvmEscrowArgs {
+  chainId: number;
   txHash: `0x${string}`;
-  expectedTo: string;
+  paymentId: `0x${string}`;
+  expectedRecipient: string;
   expectedFrom?: string;
   token: Token;
   minAmountUSD: number;
-}): Promise<VerifyResult> {
-  const client = createPublicClient({
-    chain: mainnet,
-    transport: http(ETH_RPC),
-  });
+}
+
+async function verifyEvmEscrowDeposit(
+  args: VerifyEvmEscrowArgs,
+): Promise<VerifyResult> {
+  const escrow = getEscrowAddress(args.chainId);
+  if (!escrow) {
+    return {
+      ok: false,
+      error: `No PayToChatEscrow configured server-side for chain ${args.chainId}.`,
+    };
+  }
 
   let receipt;
   try {
-    receipt = await client.getTransactionReceipt({ hash: txHash });
+    receipt = await evmClient(args.chainId).getTransactionReceipt({
+      hash: args.txHash,
+    });
   } catch {
-    return { ok: false, error: "Transaction not found yet. Wait for it to confirm and retry." };
+    return {
+      ok: false,
+      error: "Transaction not found yet. Wait for it to confirm and retry.",
+    };
   }
   if (!receipt) return { ok: false, error: "Transaction not yet mined." };
-  if (receipt.status !== "success") return { ok: false, error: "Transaction reverted on-chain." };
+  if (receipt.status !== "success") {
+    return { ok: false, error: "Transaction reverted on-chain." };
+  }
 
-  const tokenInfo = getToken("ethereum", token);
-  const expectedToCheck = getAddress(expectedTo);
-  const tokenAddrCheck = getAddress(tokenInfo.address);
+  const expectedTo = getAddress(args.expectedRecipient);
+  const escrowAddr = getAddress(escrow);
+  const tokenInfo = getToken("ethereum", args.token, args.chainId);
+  const expectedToken = getAddress(tokenInfo.address);
+  const paymentIdLc = args.paymentId.toLowerCase();
 
-  // Manual decode of the standard ERC-20 Transfer event topics.
-  const TRANSFER_TOPIC =
-    "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
   for (const log of receipt.logs) {
-    if (getAddress(log.address) !== tokenAddrCheck) continue;
-    if (log.topics[0]?.toLowerCase() !== TRANSFER_TOPIC) continue;
-    const fromTopic = log.topics[1];
-    const toTopic = log.topics[2];
-    if (!fromTopic || !toTopic) continue;
-    const from = getAddress("0x" + fromTopic.slice(26));
-    const to = getAddress("0x" + toTopic.slice(26));
-    if (to !== expectedToCheck) continue;
-    if (expectedFrom && from !== getAddress(expectedFrom)) continue;
-    const value = BigInt(log.data);
-    const amountUSD = Number(value) / 10 ** tokenInfo.decimals;
-    if (amountUSD + 1e-9 < minAmountUSD) {
+    if (getAddress(log.address) !== escrowAddr) continue;
+    let decoded;
+    try {
+      decoded = decodeEventLog({
+        abi: escrowAbi as unknown as Abi,
+        data: log.data,
+        topics: log.topics as [`0x${string}`, ...`0x${string}`[]],
+      });
+    } catch {
+      continue;
+    }
+    if (decoded.eventName !== "Deposited") continue;
+
+    const a = decoded.args as unknown as {
+      paymentId: `0x${string}`;
+      sender: `0x${string}`;
+      recipient: `0x${string}`;
+      token: `0x${string}`;
+      amount: bigint;
+      deadline: bigint;
+    };
+
+    if (a.paymentId.toLowerCase() !== paymentIdLc) continue;
+    if (getAddress(a.recipient) !== expectedTo) {
+      return { ok: false, error: "Deposit recipient does not match." };
+    }
+    if (getAddress(a.token) !== expectedToken) {
+      return { ok: false, error: `Deposit token does not match expected ${args.token}.` };
+    }
+    if (args.expectedFrom && getAddress(a.sender) !== getAddress(args.expectedFrom)) {
+      return { ok: false, error: "Deposit sender does not match the connected wallet." };
+    }
+
+    const amountUSD = Number(a.amount) / 10 ** tokenInfo.decimals;
+    if (amountUSD + 1e-9 < args.minAmountUSD) {
       return {
         ok: false,
-        error: `On-chain amount ${amountUSD} ${token} is below the requested ${minAmountUSD}.`,
+        error: `On-chain amount ${amountUSD} ${args.token} is below the requested ${args.minAmountUSD}.`,
       };
     }
-    return { ok: true, amountUSD, fromAddress: from, toAddress: to };
+    return {
+      ok: true,
+      amountUSD,
+      fromAddress: getAddress(a.sender),
+      toAddress: getAddress(a.recipient),
+      escrowDeadline: Number(a.deadline),
+    };
   }
 
   return {
     ok: false,
-    error: "No matching ERC-20 Transfer to the recipient was found in this transaction.",
+    error: "No matching Deposited event for this paymentId on the configured escrow.",
   };
 }
 
-/**
- * Verifies a USDC/USDT SPL token transfer on Solana mainnet.
- * Walks the parsed instructions looking for a transfer to the recipient's
- * associated token account (or any token account they own) with sufficient amount.
- */
+/* ----------------------------------------------------------------------- */
+/* EVM — Claimed / Refunded event verification                              */
+/* ----------------------------------------------------------------------- */
+
+export interface VerifyClaimResult {
+  ok: boolean;
+  error?: string;
+  amountToRecipient?: number;
+  fee?: number;
+  recipient?: string;
+}
+
+export async function verifyEvmClaim(args: {
+  chainId: number;
+  txHash: `0x${string}`;
+  paymentId: `0x${string}`;
+  expectedRecipient: string;
+}): Promise<VerifyClaimResult> {
+  const escrow = getEscrowAddress(args.chainId);
+  if (!escrow) {
+    return {
+      ok: false,
+      error: `No PayToChatEscrow configured server-side for chain ${args.chainId}.`,
+    };
+  }
+  let receipt;
+  try {
+    receipt = await evmClient(args.chainId).getTransactionReceipt({ hash: args.txHash });
+  } catch {
+    return { ok: false, error: "Claim tx not found yet." };
+  }
+  if (!receipt) return { ok: false, error: "Claim tx not yet mined." };
+  if (receipt.status !== "success") {
+    return { ok: false, error: "Claim tx reverted on-chain." };
+  }
+  const escrowAddr = getAddress(escrow);
+  const expectedTo = getAddress(args.expectedRecipient);
+  const paymentIdLc = args.paymentId.toLowerCase();
+  for (const log of receipt.logs) {
+    if (getAddress(log.address) !== escrowAddr) continue;
+    let decoded;
+    try {
+      decoded = decodeEventLog({
+        abi: escrowAbi as unknown as Abi,
+        data: log.data,
+        topics: log.topics as [`0x${string}`, ...`0x${string}`[]],
+      });
+    } catch {
+      continue;
+    }
+    if (decoded.eventName !== "Claimed") continue;
+    const a = decoded.args as unknown as {
+      paymentId: `0x${string}`;
+      recipient: `0x${string}`;
+      token: `0x${string}`;
+      amountToRecipient: bigint;
+      fee: bigint;
+    };
+    if (a.paymentId.toLowerCase() !== paymentIdLc) continue;
+    if (getAddress(a.recipient) !== expectedTo) {
+      return { ok: false, error: "Claim recipient does not match." };
+    }
+    return {
+      ok: true,
+      recipient: getAddress(a.recipient),
+      amountToRecipient: Number(a.amountToRecipient) / 1e6,
+      fee: Number(a.fee) / 1e6,
+    };
+  }
+  return { ok: false, error: "No matching Claimed event in this tx." };
+}
+
+export interface VerifyRefundResult {
+  ok: boolean;
+  error?: string;
+  amount?: number;
+  sender?: string;
+}
+
+export async function verifyEvmRefund(args: {
+  chainId: number;
+  txHash: `0x${string}`;
+  paymentId: `0x${string}`;
+  expectedSender: string;
+}): Promise<VerifyRefundResult> {
+  const escrow = getEscrowAddress(args.chainId);
+  if (!escrow) {
+    return {
+      ok: false,
+      error: `No PayToChatEscrow configured server-side for chain ${args.chainId}.`,
+    };
+  }
+  let receipt;
+  try {
+    receipt = await evmClient(args.chainId).getTransactionReceipt({ hash: args.txHash });
+  } catch {
+    return { ok: false, error: "Refund tx not found yet." };
+  }
+  if (!receipt) return { ok: false, error: "Refund tx not yet mined." };
+  if (receipt.status !== "success") {
+    return { ok: false, error: "Refund tx reverted on-chain." };
+  }
+  const escrowAddr = getAddress(escrow);
+  const expectedFrom = getAddress(args.expectedSender);
+  const paymentIdLc = args.paymentId.toLowerCase();
+  for (const log of receipt.logs) {
+    if (getAddress(log.address) !== escrowAddr) continue;
+    let decoded;
+    try {
+      decoded = decodeEventLog({
+        abi: escrowAbi as unknown as Abi,
+        data: log.data,
+        topics: log.topics as [`0x${string}`, ...`0x${string}`[]],
+      });
+    } catch {
+      continue;
+    }
+    if (decoded.eventName !== "Refunded") continue;
+    const a = decoded.args as unknown as {
+      paymentId: `0x${string}`;
+      sender: `0x${string}`;
+      token: `0x${string}`;
+      amount: bigint;
+    };
+    if (a.paymentId.toLowerCase() !== paymentIdLc) continue;
+    if (getAddress(a.sender) !== expectedFrom) {
+      return { ok: false, error: "Refund sender does not match." };
+    }
+    return {
+      ok: true,
+      sender: getAddress(a.sender),
+      amount: Number(a.amount) / 1e6,
+    };
+  }
+  return { ok: false, error: "No matching Refunded event in this tx." };
+}
+
+/* ----------------------------------------------------------------------- */
+/* Solana — direct SPL transfer (legacy; replaces with Anchor program later) */
+/* ----------------------------------------------------------------------- */
+
 async function verifySolana({
   signature,
   expectedTo,
@@ -117,12 +324,9 @@ async function verifySolana({
   const tokenInfo = getToken("solana", token);
   const recipientPk = new PublicKey(expectedTo);
 
-  // pre/post token balance diff — most reliable.
   const pre = parsed.meta?.preTokenBalances || [];
   const post = parsed.meta?.postTokenBalances || [];
 
-  // For every post balance whose owner == recipient and mint == token mint,
-  // compute delta against the matching pre balance.
   for (const p of post) {
     if (p.mint !== tokenInfo.address) continue;
     if (p.owner !== recipientPk.toBase58()) continue;
@@ -140,7 +344,6 @@ async function verifySolana({
     const delta = postAmount - preAmount;
     if (delta + 1e-9 < minAmountUSD) continue;
 
-    // Optionally check sender
     if (expectedFrom) {
       const senderHas = post.some(
         (pp) => pp.mint === tokenInfo.address && pp.owner === expectedFrom
@@ -166,6 +369,10 @@ async function verifySolana({
   };
 }
 
+/* ----------------------------------------------------------------------- */
+/* Public entry point                                                       */
+/* ----------------------------------------------------------------------- */
+
 export async function verifyPayment(input: {
   chain: Chain;
   token: Token;
@@ -173,14 +380,29 @@ export async function verifyPayment(input: {
   expectedTo: string;
   expectedFrom?: string;
   minAmountUSD: number;
+  /** Required for EVM escrow flow. */
+  paymentId?: string;
+  /** Required for EVM escrow flow. */
+  evmChainId?: number;
 }): Promise<VerifyResult> {
   if (input.chain === "ethereum") {
     if (!input.txHash.startsWith("0x")) {
       return { ok: false, error: "Invalid Ethereum tx hash." };
     }
-    return verifyEthereum({
+    if (!input.paymentId || !/^0x[0-9a-fA-F]{64}$/.test(input.paymentId)) {
+      return {
+        ok: false,
+        error: "EVM escrow flow requires a valid bytes32 paymentId.",
+      };
+    }
+    if (!input.evmChainId) {
+      return { ok: false, error: "EVM escrow flow requires evmChainId." };
+    }
+    return verifyEvmEscrowDeposit({
+      chainId: input.evmChainId,
       txHash: input.txHash as `0x${string}`,
-      expectedTo: input.expectedTo,
+      paymentId: input.paymentId as `0x${string}`,
+      expectedRecipient: input.expectedTo,
       expectedFrom: input.expectedFrom,
       token: input.token,
       minAmountUSD: input.minAmountUSD,

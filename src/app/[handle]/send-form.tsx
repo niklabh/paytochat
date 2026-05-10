@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Badge, Button, Card, Label } from "@/components/ui";
 import { RichEditor } from "@/components/rich-editor";
@@ -10,23 +10,37 @@ import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import {
   useAccount,
   useChainId,
+  usePublicClient,
   useSwitchChain,
   useWriteContract,
-  useWaitForTransactionReceipt,
 } from "wagmi";
-import { mainnet } from "wagmi/chains";
+import { erc20Abi, parseUnits } from "viem";
 import {
   useConnection,
   useWallet as useSolanaWallet,
 } from "@solana/wallet-adapter-react";
 import {
-  buildEvmTransferArgs,
+  buildEvmApproveArgs,
+  buildEvmDepositArgs,
+  newPaymentId,
   payOnSolana,
 } from "@/lib/payments/client";
+import {
+  DEFAULT_EVM_CHAIN_ID,
+  ESCROW_DEFAULT_DEADLINE_SECONDS,
+  chainIdName,
+  getEscrowAddress,
+} from "@/lib/payments/escrow";
+import { getToken, isTokenSupportedOnChain } from "@/lib/payments/tokens";
 import type { Chain, Token, UserDoc } from "@/lib/types";
 import { toast } from "sonner";
 import { ArrowRight, CircleDollarSign, LogIn, Sparkles } from "lucide-react";
 import Link from "next/link";
+
+// Resolved at module load via the static lookup in `escrow.ts`. Webpack
+// inlines the `NEXT_PUBLIC_ESCROW_ADDRESS_<id>` literal at build time so
+// the address is baked into the client bundle.
+const ESCROW_ADDRESS_FOR_DEFAULT_CHAIN = getEscrowAddress(DEFAULT_EVM_CHAIN_ID);
 
 interface Props {
   recipient: {
@@ -57,15 +71,16 @@ export function SendMessageForm({ recipient }: Props) {
     Math.max(recipient.minThresholdUSD, 5)
   );
   const [busy, setBusy] = useState(false);
-  const [stage, setStage] = useState<"idle" | "paying" | "verifying">("idle");
+  const [stage, setStage] = useState<
+    "idle" | "switching" | "approving" | "depositing" | "verifying"
+  >("idle");
 
   // EVM
   const { address: evmAddress, isConnected: evmConnected } = useAccount();
   const evmChainId = useChainId();
   const { switchChainAsync } = useSwitchChain();
   const { writeContractAsync } = useWriteContract();
-  const [evmHash, setEvmHash] = useState<`0x${string}` | undefined>(undefined);
-  const evmReceipt = useWaitForTransactionReceipt({ hash: evmHash });
+  const evmPublicClient = usePublicClient({ chainId: DEFAULT_EVM_CHAIN_ID });
 
   // Solana
   const { connection } = useConnection();
@@ -85,21 +100,18 @@ export function SendMessageForm({ recipient }: Props) {
     }
   }, [recipient.acceptedChains, recipient.acceptedTokens, chain, token]);
 
-  // Once tx confirmed on EVM, fire the message-creation API.
-  useEffect(() => {
-    if (!evmHash || !evmReceipt.isSuccess) return;
-    void postToApi({
-      chain: "ethereum",
-      txHash: evmHash,
-      fromAddress: evmAddress,
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [evmHash, evmReceipt.isSuccess]);
+  const evmTokenSupported = useMemo(
+    () => isTokenSupportedOnChain(token, DEFAULT_EVM_CHAIN_ID),
+    [token],
+  );
+  const evmEscrowReady = ESCROW_ADDRESS_FOR_DEFAULT_CHAIN !== null;
 
   async function postToApi(extra: {
     chain: Chain;
     txHash: string;
     fromAddress?: string;
+    paymentId?: `0x${string}`;
+    evmChainId?: number;
   }) {
     if (!user) return;
     setStage("verifying");
@@ -119,6 +131,8 @@ export function SendMessageForm({ recipient }: Props) {
           amountUSD: amount,
           txHash: extra.txHash,
           fromAddress: extra.fromAddress,
+          paymentId: extra.paymentId,
+          evmChainId: extra.evmChainId,
         }),
       });
       const data = await res.json();
@@ -130,7 +144,6 @@ export function SendMessageForm({ recipient }: Props) {
     } finally {
       setBusy(false);
       setStage("idle");
-      setEvmHash(undefined);
     }
   }
 
@@ -153,7 +166,7 @@ export function SendMessageForm({ recipient }: Props) {
     }
 
     setBusy(true);
-    setStage("paying");
+    setStage("switching");
 
     try {
       if (chain === "solana") {
@@ -184,6 +197,7 @@ export function SendMessageForm({ recipient }: Props) {
           fromAddress: solPubkey.toBase58(),
         });
       } else {
+        // EVM escrow flow (approve + deposit).
         if (!evmConnected || !evmAddress) {
           toast.error("Connect an Ethereum wallet first.");
           setBusy(false);
@@ -196,17 +210,84 @@ export function SendMessageForm({ recipient }: Props) {
           setStage("idle");
           return;
         }
-        if (evmChainId !== mainnet.id) {
-          await switchChainAsync({ chainId: mainnet.id });
+        if (!evmEscrowReady || !ESCROW_ADDRESS_FOR_DEFAULT_CHAIN) {
+          toast.error(
+            `Escrow contract not configured for ${chainIdName(DEFAULT_EVM_CHAIN_ID)}. ` +
+              "Set NEXT_PUBLIC_ESCROW_ADDRESS_<chainId> in your env.",
+          );
+          setBusy(false);
+          setStage("idle");
+          return;
         }
-        const args = buildEvmTransferArgs(
-          token,
-          recipient.wallets.ethereum as `0x${string}`,
-          amount
+        if (!evmTokenSupported) {
+          toast.error(
+            `${token} is not configured on ${chainIdName(DEFAULT_EVM_CHAIN_ID)}. ` +
+              "Try a different token or chain.",
+          );
+          setBusy(false);
+          setStage("idle");
+          return;
+        }
+        if (evmChainId !== DEFAULT_EVM_CHAIN_ID) {
+          setStage("switching");
+          await switchChainAsync({ chainId: DEFAULT_EVM_CHAIN_ID });
+        }
+
+        // Step 1: ensure the escrow has at least `amount` allowance.
+        const tokenInfo = getToken("ethereum", token, DEFAULT_EVM_CHAIN_ID);
+        const value = parseUnits(
+          amount.toFixed(tokenInfo.decimals),
+          tokenInfo.decimals,
         );
-        const hash = await writeContractAsync(args);
-        setEvmHash(hash);
-        // Verification continues in useEffect once receipt arrives.
+        const currentAllowance = evmPublicClient
+          ? ((await evmPublicClient.readContract({
+              address: tokenInfo.address as `0x${string}`,
+              abi: erc20Abi,
+              functionName: "allowance",
+              args: [evmAddress, ESCROW_ADDRESS_FOR_DEFAULT_CHAIN],
+            })) as bigint)
+          : 0n;
+        if (currentAllowance < value) {
+          setStage("approving");
+          const approveHash = await writeContractAsync(
+            buildEvmApproveArgs(
+              token,
+              DEFAULT_EVM_CHAIN_ID,
+              ESCROW_ADDRESS_FOR_DEFAULT_CHAIN,
+              amount,
+            ),
+          );
+          if (evmPublicClient) {
+            await evmPublicClient.waitForTransactionReceipt({ hash: approveHash });
+          }
+        }
+
+        // Step 2: deposit into the escrow with a fresh paymentId.
+        const paymentId = newPaymentId();
+        setStage("depositing");
+        const depositHash = await writeContractAsync(
+          buildEvmDepositArgs({
+            escrow: ESCROW_ADDRESS_FOR_DEFAULT_CHAIN,
+            paymentId,
+            recipient: recipient.wallets.ethereum as `0x${string}`,
+            token,
+            chainId: DEFAULT_EVM_CHAIN_ID,
+            amountUSD: amount,
+            deadlineSeconds: ESCROW_DEFAULT_DEADLINE_SECONDS,
+          }),
+        );
+        if (evmPublicClient) {
+          await evmPublicClient.waitForTransactionReceipt({ hash: depositHash });
+        }
+
+        // Step 3: tell the server about the deposit.
+        await postToApi({
+          chain: "ethereum",
+          txHash: depositHash,
+          fromAddress: evmAddress,
+          paymentId,
+          evmChainId: DEFAULT_EVM_CHAIN_ID,
+        });
       }
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Payment cancelled.");
@@ -354,8 +435,12 @@ export function SendMessageForm({ recipient }: Props) {
         size="lg"
         className="mt-6 w-full"
       >
-        {stage === "paying"
-          ? `Approving ${token} transfer…`
+        {stage === "switching"
+          ? `Switching to ${chainIdName(DEFAULT_EVM_CHAIN_ID)}…`
+          : stage === "approving"
+          ? `Approving ${token} for the escrow…`
+          : stage === "depositing"
+          ? `Depositing $${amount} into escrow…`
           : stage === "verifying"
           ? "Verifying on-chain…"
           : busy
@@ -366,6 +451,12 @@ export function SendMessageForm({ recipient }: Props) {
             </>
           )}
       </Button>
+      {chain === "ethereum" && (
+        <p className="mt-2 text-[11px] text-muted text-center">
+          Funds escrow on {chainIdName(DEFAULT_EVM_CHAIN_ID)} for {Math.round(ESCROW_DEFAULT_DEADLINE_SECONDS / 86400)} days.
+          The recipient claims to unlock; if they ignore it, you can refund after the deadline.
+        </p>
+      )}
     </Card>
   );
 }

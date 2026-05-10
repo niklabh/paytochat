@@ -1,0 +1,25 @@
+[package]
+name = "paytochat-escrow"
+version = "0.1.0"
+description = "Escrow program for paytochat.fun: holds an SPL tip until the recipient claims (with a small fee) or the sender refunds after a deadline."
+edition = "2021"
+license = "MIT"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "paytochat_escrow"
+
+[features]
+default = []
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+cpi = ["no-entrypoint"]
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
+# Anchor's derive macros internally reference a `feature = "anchor-debug"`
+# cfg gate; declare it here so the newer rustc cfg-check stops warning.
+anchor-debug = []
+
+[dependencies]
+anchor-lang = { version = "0.30.1", features = ["init-if-needed"] }
+anchor-spl = { version = "0.30.1", features = ["token"] }

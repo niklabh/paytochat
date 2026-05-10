@@ -1,0 +1,33 @@
+{
+  "name": "paytochat-contracts",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Escrow smart contract for paytochat.fun: holds the tip until the recipient claims, refundable by the sender after a deadline, fee on claim accrues to admin.",
+  "license": "MIT",
+  "scripts": {
+    "build": "hardhat compile",
+    "test": "hardhat test",
+    "test:gas": "REPORT_GAS=true hardhat test",
+    "coverage": "hardhat coverage",
+    "clean": "hardhat clean",
+    "keystore:new": "bash scripts/keystore-new.sh",
+    "keystore:check": "bash scripts/keystore-check.sh",
+    "deploy:sepolia": "bash scripts/deploy-with-keystore.sh sepolia",
+    "deploy:base-sepolia": "bash scripts/deploy-with-keystore.sh baseSepolia",
+    "deploy:base": "bash scripts/deploy-with-keystore.sh base",
+    "deploy:arbitrum": "bash scripts/deploy-with-keystore.sh arbitrum",
+    "deploy:optimism": "bash scripts/deploy-with-keystore.sh optimism",
+    "deploy:polygon": "bash scripts/deploy-with-keystore.sh polygon",
+    "deploy:mainnet": "bash scripts/deploy-with-keystore.sh mainnet",
+    "verify": "hardhat verify"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "@openzeppelin/contracts": "^5.1.0",
+    "@types/node": "^20.17.10",
+    "dotenv": "^16.4.7",
+    "hardhat": "^2.22.17",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.2"
+  }
+}

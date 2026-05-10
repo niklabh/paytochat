@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo } from "react";
 import {
   Coins,
+  Eye,
   ImageIcon,
   Lock,
   MessageSquare,
@@ -47,7 +48,9 @@ function MessageRow({
   onArchive: (id: string) => void;
 }) {
   const isLocked = message.status === "paid";
-  const href = `/a/dashboard/c/${encodeURIComponent(message.conversationId)}`;
+  // Each paid message is its own thread once claimed; pre-claim the
+  // /t/{messageId} route renders the locked anchor + claim CTA.
+  const href = `/a/dashboard/t/${encodeURIComponent(message.id)}`;
 
   return (
     <Link
@@ -138,6 +141,11 @@ function LockedPreview({ message }: { message: MessageDoc }) {
 }
 
 function OpenedPreview({ message }: { message: MessageDoc }) {
+  // Until the recipient pulls the tip on-chain (`status === "claimed"`)
+  // we deliberately do NOT render the amount in the preview pill. Up to
+  // that point we only show the token + chain so the recipient knows
+  // what asset to expect, not what it's worth.
+  const claimed = message.status === "claimed";
   return (
     <>
       {isHtmlBody(message.body) ? (
@@ -150,12 +158,20 @@ function OpenedPreview({ message }: { message: MessageDoc }) {
       <div className="mt-3 flex items-center justify-between gap-2 flex-wrap">
         <div className="inline-flex items-center gap-2 rounded-lg bg-emerald-500/10 border border-emerald-500/30 px-3 py-1.5 text-xs">
           <Coins size={12} className="text-emerald-300" />
-          <span className="text-emerald-200 font-semibold">
-            {formatUSD(message.amountUSD)}
-          </span>
-          <span className="text-muted">
-            in {message.token} on {message.chain}
-          </span>
+          {claimed ? (
+            <>
+              <span className="text-emerald-200 font-semibold">
+                {formatUSD(message.amountUSD)}
+              </span>
+              <span className="text-muted">
+                in {message.token} on {message.chain}
+              </span>
+            </>
+          ) : (
+            <span className="text-muted">
+              Hidden tip · claim to reveal · {message.token} on {message.chain}
+            </span>
+          )}
         </div>
         <span className="inline-flex items-center gap-1.5 rounded-lg bg-white/5 border border-white/10 px-3 py-1.5 text-xs text-foreground">
           <MessageSquare size={12} /> Open thread
@@ -180,6 +196,15 @@ function RowBadge({
     );
   }
   if (status === "opened") {
+    // Body has been revealed but funds haven't been pulled yet. Don't
+    // leak the amount; promote the next action ("claim") instead.
+    return (
+      <Badge className="bg-brand-500/15 border-brand-500/30 text-brand-200 whitespace-nowrap">
+        <Eye size={10} /> claim
+      </Badge>
+    );
+  }
+  if (status === "claimed") {
     return (
       <Badge className="bg-emerald-500/10 border-emerald-500/20 text-emerald-200 whitespace-nowrap">
         <Coins size={10} /> {formatUSD(amountUSD)}

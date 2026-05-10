@@ -10,13 +10,16 @@ import { Card, Badge } from "@/components/ui";
 import {
   Check,
   CheckCheck,
+  CircleCheck,
   Coins,
   ImageIcon,
   Loader2,
   MessageSquare,
+  Undo2,
 } from "lucide-react";
 import { formatUSD, timeAgo } from "@/lib/utils";
 import { htmlToPlainText } from "@/lib/rich-text";
+import { EscrowActions } from "@/components/escrow-actions";
 
 export default function SentPage() {
   const { user } = useAuth();
@@ -46,12 +49,11 @@ export default function SentPage() {
         </Card>
       )}
       {messages.map((m) => (
-        <Link
-          key={m.id}
-          href={`/a/dashboard/c/${encodeURIComponent(m.conversationId)}`}
-          className="block"
-        >
-          <Card className="!p-4 hover:bg-white/[.06] transition-colors">
+        <Card key={m.id} className="!p-4 hover:bg-white/[.06] transition-colors">
+          <Link
+            href={`/a/dashboard/t/${encodeURIComponent(m.id)}`}
+            className="block"
+          >
             <div className="flex items-center gap-3">
               <div className="h-10 w-10 rounded-full bg-gradient-to-tr from-brand-500 to-brand-300 flex items-center justify-center text-white font-bold">
                 {m.recipientHandle.slice(0, 1).toUpperCase()}
@@ -89,8 +91,10 @@ export default function SentPage() {
                 </div>
               </div>
             </div>
-          </Card>
-        </Link>
+          </Link>
+          {/* Refund CTA outside the Link so the buttons don't trigger nav. */}
+          <EscrowActions message={m} perspective="sender" />
+        </Card>
       ))}
     </div>
   );
@@ -98,6 +102,8 @@ export default function SentPage() {
 
 function StatusIcon({ status }: { status: MessageDoc["status"] }) {
   if (status === "opened") return <CheckCheck size={12} className="text-emerald-300" />;
+  if (status === "claimed") return <CircleCheck size={12} className="text-emerald-300" />;
+  if (status === "refunded") return <Undo2 size={12} className="text-yellow-200" />;
   if (status === "paid" || status === "free") return <Check size={12} className="text-muted" />;
   if (status === "pending") return <Loader2 size={12} className="text-muted animate-spin" />;
   return <Check size={12} className="text-muted" />;
@@ -110,6 +116,8 @@ function labelFor(status: MessageDoc["status"]) {
     case "free": return "delivered";
     case "pending": return "verifying";
     case "rejected": return "rejected";
+    case "claimed": return "claimed";
+    case "refunded": return "refunded";
   }
 }
 

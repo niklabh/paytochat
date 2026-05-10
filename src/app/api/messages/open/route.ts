@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { adminAuth, adminDb } from "@/lib/firebase/admin";
 import { FieldValue } from "firebase-admin/firestore";
-import type { MessageDoc, UserDoc } from "@/lib/types";
+import type { MessageDoc } from "@/lib/types";
 
 export const runtime = "nodejs";
 
@@ -43,19 +43,15 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, alreadyOpened: true });
   }
 
-  // Recipient's cool-off setting
-  const recipientSnap = await db.collection("users").doc(uid).get();
-  const recipient = recipientSnap.data() as UserDoc | undefined;
-  const coolOffDays = recipient?.settings.coolOffDays ?? 1;
-  const coolOffMs = coolOffDays * 24 * 60 * 60 * 1000;
-
+  // Opening just marks the message as read and decrements the unread
+  // counter. The "free reply window" is no longer tied to opening — it
+  // only starts after a successful on-chain claim, recorded into the
+  // dedicated `threads/{convId}` doc by /api/messages/claim.
   const convRef = db.collection("conversations").doc(msg.conversationId);
 
   await db.runTransaction(async (tx) => {
-    // All reads first (Admin SDK requires reads before writes).
     const convSnap = await tx.get(convRef);
 
-    // Then writes.
     tx.update(ref, {
       status: "opened",
       openedAt: FieldValue.serverTimestamp(),
@@ -66,7 +62,6 @@ export async function POST(req: Request) {
       const next = Math.max(0, (conv.unreadCount?.[uid] || 0) - 1);
       tx.update(convRef, {
         [`unreadCount.${uid}`]: next,
-        coolOffUntil: Date.now() + coolOffMs,
       });
     }
 

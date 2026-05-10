@@ -13,13 +13,19 @@ interface Props {
    * Pass `null` to do nothing.
    */
   trigger: number | null;
-  /** Optional amount label rendered behind the burst. */
-  amountLabel?: string;
 }
 
 type AnimationData = unknown;
 
-export function TipRevealConfetti({ trigger, amountLabel }: Props) {
+/**
+ * Plays a one-shot Lottie when the recipient reveals a paid message.
+ *
+ * We deliberately don't accept or render the tip amount: the amount must
+ * stay hidden in the UI until the recipient actually pulls it from the
+ * escrow on-chain (see `EscrowActions`). The animation is a confirmation
+ * that the message body has been unlocked, not a value reveal.
+ */
+export function TipRevealConfetti({ trigger }: Props) {
   const [data, setData] = useState<AnimationData | null>(null);
   const [playId, setPlayId] = useState<number | null>(null);
   const lastTrigger = useRef<number | null>(null);
@@ -52,13 +58,6 @@ export function TipRevealConfetti({ trigger, amountLabel }: Props) {
       className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center"
       aria-hidden
     >
-      {amountLabel && (
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="rounded-2xl bg-emerald-500/10 border border-emerald-500/30 px-6 py-3 text-2xl font-black text-emerald-200 shadow-glow">
-            +{amountLabel}
-          </div>
-        </div>
-      )}
       <div className="w-[min(90vw,640px)] aspect-square">
         <Lottie
           animationData={data}

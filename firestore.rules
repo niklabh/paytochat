@@ -33,20 +33,30 @@ service cloud.firestore {
 
     // Messages: only the server (Admin SDK) is allowed to write — payments
     // must be verified on-chain server-side before a message exists.
-    // Recipients & senders can read their own messages.
+    // Reads are gated by `participants` (= [senderId, recipientId].sort()),
+    // which is also what every collection-level query filters on with
+    // `array-contains`. Firestore's rules engine can then statically prove
+    // the rule holds for every result without reading individual docs.
+    //
+    // The senderId/recipientId fallback supports legacy docs (created
+    // before the participants field was added) for single-doc reads only.
+    // Collection queries against legacy docs are not supported — backfill
+    // the participants array via scripts/backfill-message-participants.ts.
     match /messages/{messageId} {
       allow read: if signedIn()
-        && (request.auth.uid == resource.data.recipientId
-            || request.auth.uid == resource.data.senderId);
+        && (
+          request.auth.uid in resource.data.get('participants', [])
+          || request.auth.uid == resource.data.recipientId
+          || request.auth.uid == resource.data.senderId
+        );
       allow create, update, delete: if false;
     }
 
     // Conversations: participants can read. Participants may update only
     // `unreadCount` (so the recipient can decrement their own counter when
-    // reading messages). Everything else — `coolOffUntil`, `lastMessageAt`,
-    // `totalPaidUSD`, etc. — is server-owned. There is no permanent
-    // free-chat flag; free replies are gated by `coolOffUntil`, which only
-    // the server (Admin SDK) can write.
+    // reading messages). Everything else — `lastMessageAt`,
+    // `totalPaidUSD`, etc. — is server-owned. The active reply window
+    // moved to the dedicated `threads` collection below.
     match /conversations/{convId} {
       allow read: if signedIn() && request.auth.uid in resource.data.participants;
 
@@ -59,6 +69,29 @@ service cloud.firestore {
             .hasOnly(['unreadCount']);
 
       allow delete: if false;
+    }
+
+    // Threads: the time-bounded reply window opened by a successful
+    // on-chain claim of one specific paid message. The doc id is the
+    // anchor paid message's id (so each paid message has its own
+    // thread, and a single conversation can have many parallel threads
+    // — one per claimed paid message). Created/updated exclusively by
+    // the server (Admin SDK) on /api/messages/claim and
+    // /api/messages/send (free-reply path); participants can read but
+    // never write directly.
+    //
+    // `get` allows reading non-existent docs (returns a "doesn't exist"
+    // snapshot to the client) so the thread page can subscribe before
+    // the recipient has claimed — at which point the doc is created
+    // server-side and the listener picks it up automatically. Without
+    // this, a doc-not-found returns "permission-denied" because
+    // `resource.data` is null.
+    match /threads/{threadId} {
+      allow get: if resource == null
+        || (signedIn() && request.auth.uid in resource.data.participants);
+      allow list: if signedIn()
+        && request.auth.uid in resource.data.participants;
+      allow create, update, delete: if false;
     }
   }
 }

@@ -1,0 +1,33 @@
+{
+  "name": "paytochat-solana",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "description": "Solana Anchor program for paytochat.fun escrow + its TypeScript test suite.",
+  "scripts": {
+    "lint": "tsc --noEmit",
+    "build": "anchor build",
+    "test": "anchor test",
+    "test:skip-build": "anchor test --skip-build",
+    "deploy:devnet": "anchor deploy --provider.cluster devnet",
+    "deploy:mainnet": "anchor deploy --provider.cluster mainnet"
+  },
+  "dependencies": {
+    "@coral-xyz/anchor": "^0.30.1",
+    "@solana/spl-token": "^0.4.9",
+    "@solana/web3.js": "^1.95.4"
+  },
+  "devDependencies": {
+    "@types/bn.js": "^5.1.6",
+    "@types/chai": "^4.3.20",
+    "@types/chai-as-promised": "^7.1.8",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^20.17.10",
+    "chai": "^4.5.0",
+    "chai-as-promised": "^7.1.2",
+    "mocha": "^10.8.2",
+    "prettier": "^3.4.2",
+    "ts-mocha": "^10.0.0",
+    "typescript": "^5.7.2"
+  }
+}

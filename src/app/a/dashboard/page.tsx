@@ -15,22 +15,13 @@ import type { MessageDoc } from "@/lib/types";
 import { Card } from "@/components/ui";
 import { ArrowUpRight, Coins, Inbox } from "lucide-react";
 import Link from "next/link";
-import { cn, formatUSD } from "@/lib/utils";
+import { formatUSD } from "@/lib/utils";
 import { MessageList, WalletNote } from "@/components/message-list";
-
-type Filter = "all" | "unread" | "opened";
-
-const FILTERS: { id: Filter; label: string }[] = [
-  { id: "all", label: "All" },
-  { id: "unread", label: "Unread" },
-  { id: "opened", label: "Opened" },
-];
 
 export default function DashboardPage() {
   const { user, profile } = useAuth();
   const [messages, setMessages] = useState<MessageDoc[]>([]);
   const [hidden, setHidden] = useState<Set<string>>(new Set());
-  const [filter, setFilter] = useState<Filter>("all");
 
   useEffect(() => {
     if (!user || !firebaseConfigured) return;
@@ -58,23 +49,10 @@ export default function DashboardPage() {
     return () => unsub();
   }, [user]);
 
-  const counts = useMemo(() => {
-    const visible = messages.filter((m) => !hidden.has(m.id));
-    return {
-      all: visible.length,
-      unread: visible.filter((m) => m.status === "paid").length,
-      opened: visible.filter((m) => m.status === "opened").length,
-    };
-  }, [messages, hidden]);
-
-  const visible = useMemo(() => {
-    return messages.filter((m) => {
-      if (hidden.has(m.id)) return false;
-      if (filter === "unread") return m.status === "paid";
-      if (filter === "opened") return m.status === "opened";
-      return true;
-    });
-  }, [messages, hidden, filter]);
+  const visible = useMemo(
+    () => messages.filter((m) => !hidden.has(m.id)),
+    [messages, hidden]
+  );
 
   function handleArchive(messageId: string) {
     setHidden((s) => new Set(s).add(messageId));
@@ -129,23 +107,9 @@ export default function DashboardPage() {
 
       <div className="flex items-center justify-between gap-3">
         <h1 className="text-xl font-bold">Inbox</h1>
-        <FilterTabs filter={filter} onChange={setFilter} counts={counts} />
       </div>
 
       <MessageList messages={visible} onArchive={handleArchive} />
-
-      {visible.length === 0 && counts.all > 0 && (
-        <div className="text-center text-sm text-muted">
-          Nothing in this view. Try{" "}
-          <button
-            onClick={() => setFilter("all")}
-            className="text-foreground underline decoration-dotted"
-          >
-            All
-          </button>
-          .
-        </div>
-      )}
 
       <WalletNote />
 
@@ -161,47 +125,6 @@ export default function DashboardPage() {
           </Link>
         </div>
       )}
-    </div>
-  );
-}
-
-function FilterTabs({
-  filter,
-  onChange,
-  counts,
-}: {
-  filter: Filter;
-  onChange: (f: Filter) => void;
-  counts: { all: number; unread: number; opened: number };
-}) {
-  return (
-    <div className="inline-flex rounded-xl border border-white/10 bg-white/5 p-1 text-xs">
-      {FILTERS.map((f) => {
-        const count = counts[f.id];
-        const active = filter === f.id;
-        return (
-          <button
-            key={f.id}
-            onClick={() => onChange(f.id)}
-            className={cn(
-              "rounded-lg px-3 py-1.5 transition-colors whitespace-nowrap",
-              active
-                ? "bg-white/10 text-foreground"
-                : "text-muted hover:text-foreground"
-            )}
-          >
-            {f.label}
-            <span
-              className={cn(
-                "ml-1.5 text-[10px]",
-                active ? "text-muted" : "text-muted/70"
-              )}
-            >
-              {count}
-            </span>
-          </button>
-        );
-      })}
     </div>
   );
 }

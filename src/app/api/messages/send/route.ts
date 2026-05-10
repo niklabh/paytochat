@@ -2,13 +2,21 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { adminAuth, adminDb } from "@/lib/firebase/admin";
 import { verifyPayment } from "@/lib/payments/verify";
+import { getEscrowAddress } from "@/lib/payments/escrow";
 import { sanitizeMessageHtml } from "@/lib/rich-text.server";
 import { sendNewMessageEmail } from "@/lib/email/sendgrid";
 import {
   Timestamp,
   FieldValue,
 } from "firebase-admin/firestore";
-import type { Chain, ConversationDoc, MessageStatus, Token, UserDoc } from "@/lib/types";
+import type {
+  Chain,
+  ConversationDoc,
+  MessageStatus,
+  ThreadDoc,
+  Token,
+  UserDoc,
+} from "@/lib/types";
 
 export const runtime = "nodejs";
 
@@ -24,8 +32,21 @@ const Body = z.object({
   txHash: z.string().optional(),
   amountUSD: z.number().nonnegative().optional(),
   fromAddress: z.string().optional(),
-  /** Sender claims a free reply inside an active cool-off window. */
+  /** EVM escrow flow only. 0x-prefixed bytes32. */
+  paymentId: z
+    .string()
+    .regex(/^0x[a-fA-F0-9]{64}$/)
+    .optional(),
+  /** Numeric chainId for the EVM chain that holds the escrow deposit. */
+  evmChainId: z.number().int().positive().optional(),
+  /** Sender claims a free reply inside an active thread. */
   free: z.boolean().optional(),
+  /**
+   * Required when `free === true`: id of the thread the reply belongs
+   * to (== the anchor paid message id). Used to scope free replies and
+   * to validate the cool-off window server-side.
+   */
+  threadId: z.string().min(1).optional(),
 });
 
 function conversationId(a: string, b: string) {
@@ -106,17 +127,56 @@ export async function POST(req: Request) {
   const convSnap = await convRef.get();
   const conv = convSnap.exists ? (convSnap.data() as ConversationDoc) : null;
 
-  const nowMs = Date.now();
-  const inCoolOff =
-    !!conv?.coolOffUntil &&
-    (typeof conv.coolOffUntil === "number"
-      ? conv.coolOffUntil > nowMs
-      : (conv.coolOffUntil as Timestamp).toMillis() > nowMs);
+  // Free replies must name the thread they belong to. Threads are
+  // per paid message (the doc id is the anchor message id), so the
+  // client tells us which thread it's replying inside.
+  let thread: ThreadDoc | null = null;
+  let threadRef: FirebaseFirestore.DocumentReference | null = null;
+  if (payload.free === true) {
+    if (!payload.threadId) {
+      return NextResponse.json(
+        { error: "threadId is required for free in-thread replies." },
+        { status: 400 },
+      );
+    }
+    threadRef = db.collection("threads").doc(payload.threadId);
+    const threadSnap = await threadRef.get();
+    if (!threadSnap.exists) {
+      return NextResponse.json(
+        { error: "Thread not found. Claim the paid message first." },
+        { status: 404 },
+      );
+    }
+    thread = threadSnap.data() as ThreadDoc;
+    if (
+      !thread.participants.includes(senderUid) ||
+      !thread.participants.includes(recipient.uid)
+    ) {
+      return NextResponse.json(
+        { error: "You aren't a participant of this thread." },
+        { status: 403 },
+      );
+    }
+  }
 
-  // Free replies are only allowed inside an active cool-off window. There
-  // is no permanent free-chat flag any more — once cool-off ends the
-  // sender must pay again to reopen the thread.
-  const isFreeMessage = payload.free === true && inCoolOff;
+  const nowMs = Date.now();
+  const threadExpiresAtMs = thread?.expiresAt
+    ? typeof thread.expiresAt === "number"
+      ? thread.expiresAt
+      : (thread.expiresAt as Timestamp).toMillis()
+    : 0;
+  const threadActive = !!thread && threadExpiresAtMs > nowMs;
+
+  // Free replies are only allowed inside the (still-active) post-claim
+  // thread window. Outside that window, the client must send a fresh
+  // paid message which will eventually open a new thread on claim.
+  const isFreeMessage = payload.free === true && threadActive;
+  if (payload.free === true && !threadActive) {
+    return NextResponse.json(
+      { error: "This thread has closed. Send a new paid message to reopen it." },
+      { status: 400 },
+    );
+  }
   let status: MessageStatus = "pending";
   let amountUSD = 0;
   let chain: Chain | undefined;
@@ -124,6 +184,10 @@ export async function POST(req: Request) {
   let txHash: string | undefined;
   let fromAddress: string | undefined;
   let toAddress: string | undefined;
+  let paymentId: string | undefined;
+  let escrowAddress: string | undefined;
+  let escrowChainId: number | undefined;
+  let escrowDeadline: number | undefined;
 
   if (isFreeMessage) {
     status = "free";
@@ -168,6 +232,38 @@ export async function POST(req: Request) {
       );
     }
 
+    // For EVM, resolve and validate the server-trusted escrow address.
+    // The client tells us which chain it deposited to, but we resolve the
+    // escrow address from server-only env vars and never trust the client.
+    if (payload.chain === "ethereum") {
+      if (!payload.evmChainId) {
+        return NextResponse.json(
+          { error: "evmChainId is required for the Ethereum escrow flow." },
+          { status: 400 },
+        );
+      }
+      if (!payload.paymentId) {
+        return NextResponse.json(
+          { error: "paymentId is required for the Ethereum escrow flow." },
+          { status: 400 },
+        );
+      }
+      const escrow = getEscrowAddress(payload.evmChainId);
+      if (!escrow) {
+        return NextResponse.json(
+          {
+            error:
+              `No PayToChatEscrow configured server-side for chain ${payload.evmChainId}. ` +
+              `Set ESCROW_ADDRESS_${payload.evmChainId} or NEXT_PUBLIC_ESCROW_ADDRESS_${payload.evmChainId}.`,
+          },
+          { status: 500 },
+        );
+      }
+      escrowAddress = escrow;
+      escrowChainId = payload.evmChainId;
+      paymentId = payload.paymentId;
+    }
+
     const verify = await verifyPayment({
       chain: payload.chain,
       token: payload.token,
@@ -175,6 +271,8 @@ export async function POST(req: Request) {
       expectedTo: recipAddress,
       expectedFrom: payload.fromAddress,
       minAmountUSD: payload.amountUSD,
+      paymentId: payload.paymentId,
+      evmChainId: payload.evmChainId,
     });
     if (!verify.ok) {
       return NextResponse.json({ error: verify.error || "Payment not verified." }, { status: 402 });
@@ -186,18 +284,38 @@ export async function POST(req: Request) {
     txHash = payload.txHash;
     fromAddress = verify.fromAddress;
     toAddress = verify.toAddress || recipAddress;
+    escrowDeadline = verify.escrowDeadline;
   }
 
-  // Use the txHash as the message doc ID for paid messages so duplicate-tx
-  // attempts collide on a single document and are caught atomically by the
-  // tx.get() guard below. Free messages keep an auto-generated ID.
-  const messageRef =
-    status === "paid" && txHash
-      ? db.collection("messages").doc(txHash)
-      : db.collection("messages").doc();
+  // Use a deterministic doc ID for paid messages so duplicate-tx attempts
+  // collide on a single document and are caught atomically by the tx.get()
+  // guard below. For escrow deposits we use `evm-<chainId>-<paymentId>` so
+  // the same paymentId on different chains is allowed (different escrow
+  // contracts). Solana keeps `txHash` directly. Free messages keep an
+  // auto-generated ID.
+  let messageRef;
+  if (status === "paid") {
+    if (paymentId && escrowChainId) {
+      messageRef = db.collection("messages").doc(`evm-${escrowChainId}-${paymentId}`);
+    } else if (txHash) {
+      messageRef = db.collection("messages").doc(txHash);
+    } else {
+      messageRef = db.collection("messages").doc();
+    }
+  } else {
+    messageRef = db.collection("messages").doc();
+  }
   const message = {
     id: messageRef.id,
     conversationId: convId,
+    // Free replies inherit the thread's id (which is the anchor paid
+    // message's id). Paid messages get their threadId stamped on later
+    // by /api/messages/claim, so it stays null until a claim happens.
+    threadId: status === "free" ? payload.threadId ?? null : null,
+    // Sorted [senderId, recipientId] so the thread page can do
+    // `where("participants", "array-contains", uid)` and have Firestore
+    // rules engine accept the query.
+    participants: [senderUid, recipient.uid].sort(),
     senderId: senderUid,
     senderHandle: sender.handle,
     senderDisplayName: sender.displayName,
@@ -212,13 +330,24 @@ export async function POST(req: Request) {
     txHash: txHash ?? null,
     fromAddress: fromAddress ?? null,
     toAddress: toAddress ?? null,
+    paymentId: paymentId ?? null,
+    escrowAddress: escrowAddress ?? null,
+    escrowChainId: escrowChainId ?? null,
+    escrowDeadline: escrowDeadline ?? null,
     status,
     createdAt: FieldValue.serverTimestamp(),
     paidAt: status === "paid" ? FieldValue.serverTimestamp() : null,
     openedAt: null,
+    claimedAt: null,
+    claimTxHash: null,
+    refundedAt: null,
+    refundTxHash: null,
   };
 
-  // Conversation update
+  // Conversation update. We deliberately do NOT touch `totalPaidUSD`
+  // here — that aggregate is only incremented on a successful on-chain
+  // claim (see /api/messages/claim), which is what the user actually
+  // received. Same goes for `users.stats.totalEarnedUSD`.
   const updatedUnread = {
     ...(conv?.unreadCount || {}),
     [recipient.uid]:
@@ -230,9 +359,8 @@ export async function POST(req: Request) {
     participants: [senderUid, recipient.uid].sort(),
     participantHandles: [sender.handle, recipient.handle].sort(),
     lastMessageAt: FieldValue.serverTimestamp(),
-    lastMessagePreview: status === "paid" ? "paid message" : bodyPlain.slice(0, 80),
-    coolOffUntil: conv?.coolOffUntil ?? null,
-    totalPaidUSD: (conv?.totalPaidUSD || 0) + amountUSD,
+    lastMessagePreview:
+      status === "paid" ? "paid message" : bodyPlain.slice(0, 80),
     unreadCount: updatedUnread,
   };
 
@@ -250,10 +378,22 @@ export async function POST(req: Request) {
 
       tx.set(messageRef, message);
       tx.set(convRef, convUpdate, { merge: true });
+
+      // Bump the "messages received" counter on every paid send (this
+      // is a delivery count, not a money count, so it stays here).
       if (status === "paid") {
         tx.update(db.collection("users").doc(recipient.uid), {
-          "stats.totalEarnedUSD": FieldValue.increment(amountUSD),
           "stats.messagesReceived": FieldValue.increment(1),
+        });
+      }
+
+      // For free in-thread replies, bump the thread's reply counter
+      // and refresh the list-ordering / preview fields.
+      if (status === "free" && thread && threadRef) {
+        tx.update(threadRef, {
+          freeReplyCount: FieldValue.increment(1),
+          lastMessageAt: Date.now(),
+          lastMessagePreview: bodyPlain.slice(0, 80),
         });
       }
     });
