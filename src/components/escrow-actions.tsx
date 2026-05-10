@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useAccount, useChainId, usePublicClient, useSwitchChain, useWriteContract } from "wagmi";
-import { CheckCircle2, Coins, Hourglass, ShieldCheck, Undo2 } from "lucide-react";
+import { useConnectModal } from "@rainbow-me/rainbowkit";
+import { CheckCircle2, Coins, Hourglass, ShieldCheck, Undo2, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui";
@@ -35,6 +36,7 @@ export function EscrowActions({ message, perspective, onResolved }: Props) {
   const evmChainId = useChainId();
   const { switchChainAsync } = useSwitchChain();
   const { writeContractAsync } = useWriteContract();
+  const { openConnectModal } = useConnectModal();
   const targetChainId = message.escrowChainId ?? null;
   const publicClient = usePublicClient({ chainId: targetChainId ?? undefined });
   const [busy, setBusy] = useState(false);
@@ -103,7 +105,13 @@ export function EscrowActions({ message, perspective, onResolved }: Props) {
       if (!user) return;
       if (!message.escrowAddress || !message.paymentId || !message.escrowChainId) return;
       if (!isConnected || !evmAddress) {
-        toast.error("Connect your Ethereum wallet to claim.");
+        // No wallet connected: open the RainbowKit modal so the user can
+        // pick one. Once they're connected they can hit "Claim now" again.
+        if (openConnectModal) {
+          openConnectModal();
+        } else {
+          toast.error("Connect your Ethereum wallet to claim.");
+        }
         return;
       }
       // Recipient-address sanity check: warn if connected wallet isn't the
@@ -166,7 +174,19 @@ export function EscrowActions({ message, perspective, onResolved }: Props) {
               amount is hidden until you pull it on-chain — claim to reveal.
             </p>
             <Button onClick={() => void onClaim()} disabled={busy} size="sm" className="mt-3">
-              <Coins size={14} /> {busy ? "Claiming…" : "Claim now"}
+              {busy ? (
+                <>
+                  <Coins size={14} /> Claiming…
+                </>
+              ) : !isConnected ? (
+                <>
+                  <Wallet size={14} /> Connect wallet to claim
+                </>
+              ) : (
+                <>
+                  <Coins size={14} /> Claim now
+                </>
+              )}
             </Button>
           </div>
         </div>
@@ -181,7 +201,11 @@ export function EscrowActions({ message, perspective, onResolved }: Props) {
     if (!user) return;
     if (!message.escrowAddress || !message.paymentId || !message.escrowChainId) return;
     if (!isConnected || !evmAddress) {
-      toast.error("Connect your Ethereum wallet to refund.");
+      if (openConnectModal) {
+        openConnectModal();
+      } else {
+        toast.error("Connect your Ethereum wallet to refund.");
+      }
       return;
     }
     if (
@@ -248,7 +272,19 @@ export function EscrowActions({ message, perspective, onResolved }: Props) {
         </div>
         {deadlinePassed && (
           <Button onClick={() => void onRefund()} disabled={busy} size="sm">
-            <Undo2 size={14} /> {busy ? "Refunding…" : "Refund"}
+            {busy ? (
+              <>
+                <Undo2 size={14} /> Refunding…
+              </>
+            ) : !isConnected ? (
+              <>
+                <Wallet size={14} /> Connect wallet to refund
+              </>
+            ) : (
+              <>
+                <Undo2 size={14} /> Refund
+              </>
+            )}
           </Button>
         )}
       </div>
