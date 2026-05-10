@@ -38,3 +38,6 @@ serviceAccount*.json
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# deployment notes (contains local paths / on-chain audit trail)
+deployment.log
