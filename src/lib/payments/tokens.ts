@@ -1,14 +1,45 @@
 import type { Chain, Token } from "../types";
 
-/** Solana mints — keyed by token symbol; SPL flow uses these directly. */
-const SOLANA_MINTS: Record<Token, { address: string; decimals: number }> = {
+/** Which on-chain SPL program owns a given Solana mint. */
+export type SolanaTokenProgram = "spl-token" | "spl-token-2022";
+
+/**
+ * Solana mints — keyed by token symbol; SPL flow uses these directly.
+ *
+ * `tokenProgram` selects between the legacy SPL Token program
+ * (`TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA`) and the newer
+ * SPL Token-2022 program (`TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb`).
+ * Token-2022 mints (e.g. USDG) need the matching program everywhere we
+ * derive ATAs, build transfer instructions, and sign CPIs.
+ */
+const SOLANA_MINTS: Record<
+  Token,
+  { address: string; decimals: number; tokenProgram: SolanaTokenProgram }
+> = {
   USDC: {
     address: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
     decimals: 6,
+    tokenProgram: "spl-token",
   },
   USDT: {
     address: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
     decimals: 6,
+    tokenProgram: "spl-token",
+  },
+  // Paxos Global Dollar (USDG). Token-2022 mint with these extensions
+  // currently enabled on the mint config:
+  //   - permanentDelegate (Paxos can move/burn tokens at any time)
+  //   - transferFeeConfig (currently 0 bps; could be raised by Paxos)
+  //   - transferHook (authority set, programId null — no hook today)
+  //   - confidentialTransfer / confidentialTransferFee
+  //   - mintCloseAuthority, metadataPointer, tokenMetadata
+  // The transferFee extension means deposits/transfers may net less than
+  // the requested amount once Paxos enables a non-zero fee, exactly the
+  // same way fee-on-transfer ERC-20s already behave in the EVM escrow.
+  USDG: {
+    address: "2u1tszSeqZ3qBWF3uNGPFc8TzMk2tdiwknnRMWGWjGWH",
+    decimals: 6,
+    tokenProgram: "spl-token-2022",
   },
 };
 
@@ -22,11 +53,14 @@ const SOLANA_MINTS: Record<Token, { address: string; decimals: number }> = {
  * Sources:
  *   - Mainnet:  Etherscan canonical contracts.
  *   - Sepolia:  Circle's testnet USDC. Sepolia has no canonical USDT;
- *              users testing USDT flow there should deploy a mock token.
+ *              users testing USDT/USDG flow there should deploy a mock token.
  *   - Base:    USDC = native (Circle). USDT not common on Base — leave undefined.
  *   - Arbitrum: USDC = native (Circle), USDT = bridged Tether.
  *   - Optimism: USDC = native, USDT = bridged.
  *   - Polygon: USDC = native, USDT = native.
+ *   - USDG:    Paxos Global Dollar. Currently only deployed on Ethereum mainnet
+ *              (and Ink + X Layer, which we don't yet target). See
+ *              <https://docs.paxos.com/guides/stablecoin/usdg/mainnet>.
  */
 const EVM_TOKENS: Record<Token, {
   decimals: number;
@@ -53,6 +87,12 @@ const EVM_TOKENS: Record<Token, {
       137: "0xc2132D05D31c914a87C6611C10748AEb04B58e8F",
     },
   },
+  USDG: {
+    decimals: 6,
+    addresses: {
+      1: "0xe343167631d89B6Ffc58B88d6b7fB0228795491D",
+    },
+  },
 };
 
 export interface TokenInfo {
@@ -61,6 +101,12 @@ export interface TokenInfo {
   /** Mint (Solana) or contract address (EVM). */
   address: string;
   decimals: number;
+  /**
+   * Solana-only: which SPL program owns this mint. Undefined for EVM
+   * tokens. Callers building ATAs / transfer ixs must use the matching
+   * program id (legacy vs Token-2022).
+   */
+  tokenProgram?: SolanaTokenProgram;
 }
 
 /**
@@ -82,6 +128,7 @@ export function getToken(
       token,
       address: m.address,
       decimals: m.decimals,
+      tokenProgram: m.tokenProgram,
     };
   }
   const cid = chainId ?? 1;
@@ -105,3 +152,6 @@ export function isTokenSupportedOnChain(
 ): boolean {
   return Boolean(EVM_TOKENS[token].addresses[chainId]);
 }
+
+/** All tokens we support somewhere. UI components iterate this. */
+export const ALL_TOKENS: readonly Token[] = ["USDC", "USDT", "USDG"];

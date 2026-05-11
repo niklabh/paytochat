@@ -11,6 +11,7 @@ import {
   createAssociatedTokenAccountInstruction,
   createTransferCheckedInstruction,
   TOKEN_PROGRAM_ID,
+  TOKEN_2022_PROGRAM_ID,
   ASSOCIATED_TOKEN_PROGRAM_ID,
 } from "@solana/spl-token";
 import { erc20Abi, parseUnits, toHex } from "viem";
@@ -41,8 +42,27 @@ export async function payOnSolana(args: {
   const mint = new PublicKey(tokenInfo.address);
   const recipient = new PublicKey(toAddress);
 
-  const fromAta = getAssociatedTokenAddressSync(mint, fromPubkey);
-  const toAta = getAssociatedTokenAddressSync(mint, recipient);
+  // Token-2022 mints (e.g. USDG) live under a different SPL program
+  // than the legacy USDC / USDT mints. Pick the right program everywhere
+  // we touch this mint, otherwise the ATA derivation and the transfer
+  // instruction both reject with InvalidAccountData.
+  const tokenProgramId =
+    tokenInfo.tokenProgram === "spl-token-2022"
+      ? TOKEN_2022_PROGRAM_ID
+      : TOKEN_PROGRAM_ID;
+
+  const fromAta = getAssociatedTokenAddressSync(
+    mint,
+    fromPubkey,
+    false,
+    tokenProgramId,
+  );
+  const toAta = getAssociatedTokenAddressSync(
+    mint,
+    recipient,
+    false,
+    tokenProgramId,
+  );
 
   const ixs: TransactionInstruction[] = [];
 
@@ -54,7 +74,7 @@ export async function payOnSolana(args: {
         toAta,
         recipient,
         mint,
-        TOKEN_PROGRAM_ID,
+        tokenProgramId,
         ASSOCIATED_TOKEN_PROGRAM_ID
       )
     );
@@ -68,7 +88,9 @@ export async function payOnSolana(args: {
       toAta,
       fromPubkey,
       amount,
-      tokenInfo.decimals
+      tokenInfo.decimals,
+      undefined,
+      tokenProgramId,
     )
   );
 

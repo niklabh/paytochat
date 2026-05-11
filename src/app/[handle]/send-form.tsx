@@ -31,7 +31,7 @@ import {
   chainIdName,
   getEscrowAddress,
 } from "@/lib/payments/escrow";
-import { getToken, isTokenSupportedOnChain } from "@/lib/payments/tokens";
+import { ALL_TOKENS, getToken, isTokenSupportedOnChain } from "@/lib/payments/tokens";
 import type { Chain, Token, UserDoc } from "@/lib/types";
 import { toast } from "sonner";
 import { ArrowRight, CircleDollarSign, LogIn, Sparkles } from "lucide-react";
@@ -351,8 +351,8 @@ export function SendMessageForm({ recipient }: Props) {
         </div>
         <div className="space-y-1.5">
           <Label>Token</Label>
-          <div className="grid grid-cols-2 gap-2">
-            {(["USDC", "USDT"] as Token[]).map((t) => {
+          <div className="grid grid-cols-3 gap-2">
+            {ALL_TOKENS.map((t) => {
               const enabled = recipient.acceptedTokens.includes(t);
               return (
                 <button

@@ -20,7 +20,7 @@ const geistMono = localFont({
 export const metadata: Metadata = {
   title: "Pay to Chat — your inbox, on your terms",
   description:
-    "Get paid to read messages. Senders pay in USDC or USDT on Solana or Ethereum. The amount is hidden until you swipe to reveal.",
+    "Get paid to read messages. Senders pay in USDC, USDT, or USDG on Solana or Ethereum. The amount is hidden until you swipe to reveal.",
   metadataBase: new URL("https://paytochat.fun"),
   manifest: "/manifest.webmanifest",
   applicationName: "Pay to Chat",
@@ -32,7 +32,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Pay to Chat",
     description:
-      "Your time is valuable. Make people pay to land in your inbox — in USDC or USDT.",
+      "Your time is valuable. Make people pay to land in your inbox — in USDC, USDT, or USDG.",
     url: "https://paytochat.fun",
     siteName: "Pay to Chat",
     type: "website",
