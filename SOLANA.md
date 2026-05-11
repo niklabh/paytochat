@@ -400,6 +400,45 @@ For each mint:
 - [ ] Verify both mints show `is_allowed: true` by reading the
       `TokenConfig` PDA (Anchor: `program.account.tokenConfig.fetch(...)`).
 
+### 7.3 USDG on Solana (Token-2022) — current status
+
+USDG mainnet mint: `2u1tszSeqZ3qBWF3uNGPFc8TzMk2tdiwknnRMWGWjGWH`
+
+USDG is a **Token-2022** mint (owner program
+`TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb`) with these extensions
+enabled on the mint:
+
+- `mintCloseAuthority`, `metadataPointer`, `tokenMetadata`
+- `permanentDelegate` — Paxos can move or burn USDG out of any wallet
+- `transferFeeConfig` (currently 0 bps, but Paxos can raise it)
+- `transferHook` (authority set, programId null today)
+- `confidentialTransferMint` / `confidentialTransferFeeConfig`
+
+The Anchor program in `programs/paytochat-escrow/src/lib.rs` is built
+against the legacy SPL Token program (`anchor_spl::token::{Token,
+TokenAccount, Transfer}`). It **cannot** custody Token-2022 mints as-is —
+the `init` constraint for the per-mint Vault token account requires the
+legacy program as owner.
+
+What works today:
+
+- ✅ **Frontend direct transfer**: `payOnSolana` in
+  `src/lib/payments/client.ts` is Token-2022 aware and routes USDG
+  through `TOKEN_2022_PROGRAM_ID`. End-to-end USDG sends on Solana work
+  through this path right now — no on-chain action needed.
+- ❌ **Anchor escrow**: skip `set_token_allowed` for the USDG mint until
+  the program is upgraded; the script's vault-init will revert.
+
+Upgrade path (separate work item):
+
+1. Swap `anchor_spl::token` → `anchor_spl::token_interface` so the program
+   accepts either token program; gate it on the mint's owner.
+2. Re-deploy via the Squads multisig that holds the upgrade authority.
+3. Then run §7.2 with the USDG mint to allowlist it.
+
+Track this as a follow-up; the EVM side already supports USDG end-to-end
+through `setTokenAllowed` (see [DEPLOYMENT.md §5](./DEPLOYMENT.md)).
+
 ---
 
 ## 8. Smoke-test mainnet with real money

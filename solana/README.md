@@ -195,6 +195,15 @@ After deploy, the admin (which is the Pubkey passed to `initialize`,
    mainnet: `Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB`. The first
    call per mint also creates the per-mint vault token account.
 
+   ⚠ **Token-2022 mints (e.g. USDG —
+   `2u1tszSeqZ3qBWF3uNGPFc8TzMk2tdiwknnRMWGWjGWH`) are not yet supported
+   by this program.** The vault account is `init`-ed under the legacy
+   SPL Token program, so allowlisting a Token-2022 mint will fail at
+   account creation. Upgrade the program to `anchor_spl::token_interface`
+   first, then allowlist. The frontend already sends USDG end-to-end via
+   `payOnSolana` (direct SPL transfer using `TOKEN_2022_PROGRAM_ID`),
+   which bypasses the escrow path. See [SOLANA.md §7.3](../SOLANA.md).
+
 ## Operational runbook
 
 - **Withdraw fees** (monthly or on demand): admin signs `withdraw_fees`

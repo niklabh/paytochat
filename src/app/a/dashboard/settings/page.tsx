@@ -26,6 +26,7 @@ export default function SettingsPage() {
   const [acceptSol, setAcceptSol] = useState(true);
   const [acceptUSDC, setAcceptUSDC] = useState(true);
   const [acceptUSDT, setAcceptUSDT] = useState(true);
+  const [acceptUSDG, setAcceptUSDG] = useState(true);
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [busy, setBusy] = useState(false);
 
@@ -46,6 +47,7 @@ export default function SettingsPage() {
     setAcceptSol(profile.settings.acceptedChains.includes("solana"));
     setAcceptUSDC(profile.settings.acceptedTokens.includes("USDC"));
     setAcceptUSDT(profile.settings.acceptedTokens.includes("USDT"));
+    setAcceptUSDG(profile.settings.acceptedTokens.includes("USDG"));
     setEmailNotifications(profile.settings.emailNotifications ?? true);
   }, [profile]);
 
@@ -60,6 +62,7 @@ export default function SettingsPage() {
       const acceptedTokens: Token[] = [
         ...(acceptUSDC ? (["USDC"] as const) : []),
         ...(acceptUSDT ? (["USDT"] as const) : []),
+        ...(acceptUSDG ? (["USDG"] as const) : []),
       ];
       if (acceptedChains.length === 0)
         throw new Error("Pick at least one chain.");
@@ -123,7 +126,7 @@ export default function SettingsPage() {
       <Card>
         <h2 className="text-lg font-semibold">Receive wallets</h2>
         <p className="mt-1 text-sm text-muted">
-          Senders pay USDC / USDT directly to these addresses. We never custody funds.
+          Senders pay USDC / USDT / USDG directly to these addresses. We never custody funds.
         </p>
         <div className="mt-4 grid md:grid-cols-2 gap-4">
           <Field label="Ethereum address (mainnet)">
@@ -194,6 +197,7 @@ export default function SettingsPage() {
             <div className="mt-2 flex flex-col gap-2">
               <Switch checked={acceptUSDC} onChange={setAcceptUSDC} label="USDC" />
               <Switch checked={acceptUSDT} onChange={setAcceptUSDT} label="USDT" />
+              <Switch checked={acceptUSDG} onChange={setAcceptUSDG} label="USDG" />
             </div>
           </div>
         </div>

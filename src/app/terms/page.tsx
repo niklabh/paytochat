@@ -36,7 +36,7 @@ export default function TermsPage() {
               Pay to Chat (&ldquo;<strong>Pay to Chat</strong>,&rdquo;
               &ldquo;<strong>we</strong>,&rdquo; or
               &ldquo;<strong>the Service</strong>&rdquo;) is a web app at
-              paytochat.fun that lets a sender attach a USDC or USDT stablecoin
+              paytochat.fun that lets a sender attach a USDC, USDT, or USDG stablecoin
               tip to a written message and deliver that message to a recipient
               who has claimed a public handle on the Service. The recipient
               decides whether to read it.
@@ -74,7 +74,7 @@ export default function TermsPage() {
           <Section title="4. Payments and stablecoin transfers">
             <p>
               Pay to Chat is <strong>non-custodial</strong>. Senders transfer
-              USDC or USDT directly from their own wallet to the recipient&apos;s
+              USDC, USDT, or USDG directly from their own wallet to the recipient&apos;s
               wallet on Solana mainnet or Ethereum mainnet. We never hold,
               touch, or have signing authority over user funds.
             </p>
@@ -82,7 +82,7 @@ export default function TermsPage() {
               <li>You are solely responsible for the wallet you connect, the address you send to, and the network you choose. <strong>On-chain transfers are irreversible.</strong></li>
               <li>Network fees (gas / priority fees) are paid by the sender to the underlying blockchain, not to us.</li>
               <li>The Service verifies a transaction&apos;s recipient, token contract / SPL mint, and amount before unlocking the message. A message that fails verification will not be delivered, but the on-chain transfer itself cannot be undone by us.</li>
-              <li>USDC and USDT are issued by third parties (Circle and Tether). Their issuer terms, including freeze and blacklist powers, apply to balances independent of the Service.</li>
+              <li>USDC, USDT, and USDG are issued by third parties (Circle, Tether, and Paxos respectively). Their issuer terms, including freeze, blacklist, and (for USDG&apos;s Solana mint) permanent-delegate powers, apply to balances independent of the Service.</li>
               <li>Stablecoin tips are <strong>not refundable through the Service</strong>. If a recipient chooses not to read a message, the tip stays with the recipient. Disputes are between the sender and recipient.</li>
             </ul>
           </Section>

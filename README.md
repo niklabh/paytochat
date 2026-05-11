@@ -2,7 +2,7 @@
 
 **Pay to Chat** is a web app at **[paytochat.fun](https://paytochat.fun)**
 that lets you charge people to send you a direct message. Senders attach
-USDC or USDT — on Solana or Ethereum — to a message and transfer it
+USDC, USDT, or USDG — on Solana or Ethereum — to a message and transfer it
 straight to your wallet. We never hold the funds.
 
 You see your inbox as a list of locked cards. The sender, their handle,
@@ -30,7 +30,7 @@ full of unpaid DM requests. Pay or be ignored.
   Bodies are sanitized server-side before being persisted.
 - **Hidden-amount messaging** — recipients see who sent it, but not how much
   it's worth, until they reveal.
-- **Stablecoins on the chain you choose** — USDC / USDT on Solana mainnet or
+- **Stablecoins on the chain you choose** — USDC / USDT / USDG on Solana mainnet or
   Ethereum mainnet. We never custody funds; senders transfer directly to the
   recipient's wallet and the server only verifies the on-chain transaction
   before unlocking the message.
@@ -357,7 +357,9 @@ chain-agnostic:
 - **`contracts/`** — Solidity / Hardhat for EVM chains
   (Ethereum mainnet + L2s like Base, Arbitrum, Optimism, Polygon).
 - **`solana/`** — Rust / Anchor program for Solana (SPL tokens
-  USDC / USDT).
+  USDC / USDT). USDG (Token-2022) currently ships through the direct
+  SPL transfer client path in `src/lib/payments/client.ts`; the Anchor
+  escrow program needs a Token-2022 upgrade before it can custody USDG.
 
 `contracts/` is a self-contained Hardhat project containing
 `PayToChatEscrow.sol` — a secure ERC-20 escrow that lets us upgrade the

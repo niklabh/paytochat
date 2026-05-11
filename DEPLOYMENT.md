@@ -32,7 +32,7 @@ security model; this doc focuses on _operating_ it.
 | 3 | Dry-run on a testnet | `pnpm deploy:base-sepolia` (or `:sepolia`) |
 | 4 | Smoke-test on the testnet contract | Hardhat console |
 | 5 | Deploy to mainnet with a Safe owner | `pnpm deploy:base` |
-| 6 | Allowlist USDC/USDT (multisig tx) | Etherscan / Safe |
+| 6 | Allowlist USDC/USDT/USDG (multisig tx) | Etherscan / Safe |
 | 7 | Wire the Next.js app | `src/lib/payments/*`, env vars |
 | 8 | Update Firestore schema + rules | `firestore.rules`, types |
 | 9 | Add claim/refund UX | `dashboard/c/[convId]`, `dashboard/sent` |
@@ -78,7 +78,7 @@ Fill in `.env`:
 | `BASESCAN_API_KEY` | Yes for `verify` | Free at [basescan.org/myapikey](https://basescan.org/myapikey). |
 | `INITIAL_OWNER` | Yes for prod | The address that will own the contract. **Use a Safe multisig.** Leave blank only for testnet dry-runs. |
 | `INITIAL_FEE_BPS` | Yes | Basis points (250 = 2.5%). Hard-capped at 1000 by the contract. |
-| `USDC_ADDRESS` / `USDT_ADDRESS` | Recommended | Per-chain stablecoin addresses (see comments in `.env.example`). |
+| `USDC_ADDRESS` / `USDT_ADDRESS` / `USDG_ADDRESS` | Recommended | Per-chain stablecoin addresses (see comments in `.env.example`). Leave `USDG_ADDRESS` blank on chains where Paxos hasn't deployed USDG yet. |
 
 **Do NOT put a private key in `.env`.** Use the encrypted keystore flow:
 
@@ -209,7 +209,7 @@ Replace `250` with whatever `INITIAL_FEE_BPS` you used.
 
 ---
 
-## 5. Allowlist USDC / USDT (Safe multisig tx)
+## 5. Allowlist USDC / USDT / USDG (Safe multisig tx)
 
 Until the Safe calls `setTokenAllowed`, no deposits can happen. From the
 Safe UI:
@@ -222,6 +222,19 @@ Safe UI:
 4. Method: `setTokenAllowed`.
 5. Args: USDC address, `true`. Submit. Get signers to approve. Execute.
 6. Repeat for USDT.
+7. Repeat for USDG (Ethereum mainnet:
+   `0xe343167631d89B6Ffc58B88d6b7fB0228795491D`). Paxos has not yet
+   deployed USDG on Base / Arbitrum / Optimism / Polygon — skip the
+   USDG step on those chains.
+
+Verify each token is allowlisted after the Safe tx executes by reading
+the escrow on a block explorer:
+
+```
+escrow.tokenAllowed(0xUSDC)  // -> true
+escrow.tokenAllowed(0xUSDT)  // -> true
+escrow.tokenAllowed(0xUSDG)  // -> true (mainnet only)
+```
 
 Do the same dance for `setFeeBps(N)` if you want a different fee than the
 constructor value.

@@ -28,7 +28,7 @@ export default function LandingPage() {
         </h1>
         <p className="mt-6 text-lg md:text-xl text-muted max-w-2xl mx-auto text-balance">
           Spam, marketing blasts, cold pitches — your attention is worth more.
-          Senders attach <span className="text-foreground">USDC or USDT</span> on Solana or
+          Senders attach <span className="text-foreground">USDC, USDT, or USDG</span> on Solana or
           Ethereum. The tip amount stays hidden until you tap to reveal.
         </p>
         <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-3">
@@ -70,7 +70,7 @@ export default function LandingPage() {
             {
               Icon: HandCoins,
               title: "2. Share your link",
-              body: "paytochat.fun/yourname. Drop it in your X bio, your IG link tree, your email signature. Senders pay USDC or USDT directly to your wallet.",
+              body: "paytochat.fun/yourname. Drop it in your X bio, your IG link tree, your email signature. Senders pay USDC, USDT, or USDG directly to your wallet.",
             },
             {
               Icon: Eye,
@@ -95,7 +95,7 @@ export default function LandingPage() {
         <div className="grid md:grid-cols-2 gap-4">
           <Feature
             Icon={Coins}
-            title="USDC + USDT, on the chain you choose"
+            title="USDC, USDT, USDG, on the chain you choose"
             body="Stablecoins only — no price guessing. Senders pick Solana for sub-cent fees or Ethereum for the network they already use. You receive on your own wallet, instantly."
           />
           <Feature

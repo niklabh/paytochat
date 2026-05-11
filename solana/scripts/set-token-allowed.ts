@@ -6,12 +6,22 @@
  * Existing pending payments in a now-disallowed mint can still be
  * claimed and refunded — the allowlist only gates new deposits.
  *
- * Must be signed by the program's `Config.admin`. For production this
- * is the Squads multisig vault, in which case use Squads' Program
- * Interaction UI instead of this script (see SOLANA.md §7.2). This
- * script is for devnet / dry-run / single-key-admin setups.
+ * Must be signed by the program's `Config.admin`. The connected wallet
+ * (default `~/.config/solana/id.json`, override via `ANCHOR_WALLET` or
+ * `--wallet`) must equal `Config.admin` or the tx reverts with NotAdmin.
+ * For a multisig admin (e.g. Squads), use the multisig's Program
+ * Interaction UI instead — see SOLANA.md §7.2.
  *
- * Usage:
+ * Usage (via the `solana/` package script — note the `--` so npm forwards
+ * the flags to ts-node):
+ *   ANCHOR_PROVIDER_URL=https://api.mainnet-beta.solana.com \
+ *   ANCHOR_WALLET=~/.config/solana/id.json \
+ *   npm run set-token-allowed -- \
+ *     --cluster mainnet \
+ *     --mint EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v \
+ *     --allowed true
+ *
+ * Or invoke ts-node directly:
  *   ts-node solana/scripts/set-token-allowed.ts \
  *     --cluster devnet \
  *     --mint 4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU \
@@ -22,10 +32,24 @@
  *     ts-node solana/scripts/set-token-allowed.ts
  *
  * Common mainnet mints:
- *   USDC  EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v
- *   USDT  Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB
+ *   USDC  EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v   (SPL legacy)
+ *   USDT  Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB   (SPL legacy)
+ *   USDG  2u1tszSeqZ3qBWF3uNGPFc8TzMk2tdiwknnRMWGWjGWH   (Token-2022) ⚠
  * Devnet:
  *   USDC  4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU
+ *
+ * ⚠ USDG and any other Token-2022 mint will revert against the current
+ *   program build. The instruction validates the mint and vault via
+ *   `anchor_spl::token::{Mint, TokenAccount}`, which require the legacy
+ *   SPL Token program as owner. Upgrade the program to
+ *   `anchor_spl::token_interface` (Token-2022 + legacy in one surface)
+ *   and re-deploy before allowlisting USDG.
+ *
+ *   The Next.js app does not depend on this — its Solana payment flow
+ *   is a direct SPL transfer (see `payOnSolana` in
+ *   `src/lib/payments/client.ts`) and already routes USDG through
+ *   `TOKEN_2022_PROGRAM_ID`. The escrow program is a POC for the
+ *   future server-mediated flow.
  */
 
 import { SystemProgram, SYSVAR_RENT_PUBKEY } from "@solana/web3.js";

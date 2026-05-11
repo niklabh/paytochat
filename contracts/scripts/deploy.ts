@@ -11,6 +11,9 @@
  *                       Capped at 1000 (10%) by the contract.
  *   USDC_ADDRESS      - if set, allowlists this token.
  *   USDT_ADDRESS      - if set, allowlists this token.
+ *   USDG_ADDRESS      - if set, allowlists this token. Paxos Global Dollar
+ *                       only exists on a subset of chains today (Ethereum
+ *                       mainnet, Ink, X Layer); leave blank elsewhere.
  *   RESUME_TX_HASH    - if set, SKIP broadcasting a new deployment and
  *                       just resolve the contract address from this
  *                       previously-broadcast tx hash, then continue with
@@ -150,10 +153,13 @@ async function main() {
   // is unset/equal to the deployer. Otherwise we just print instructions.
   const usdc = process.env.USDC_ADDRESS?.trim();
   const usdt = process.env.USDT_ADDRESS?.trim();
-  const tokens = [usdc, usdt].filter((x): x is string => !!x);
+  const usdg = process.env.USDG_ADDRESS?.trim();
+  const tokens = [usdc, usdt, usdg].filter((x): x is string => !!x);
 
   if (tokens.length === 0) {
-    console.log("\nNo USDC_ADDRESS / USDT_ADDRESS provided — skipping allowlist.");
+    console.log(
+      "\nNo USDC_ADDRESS / USDT_ADDRESS / USDG_ADDRESS provided — skipping allowlist.",
+    );
   } else if (initialOwner.toLowerCase() === deployerAddr.toLowerCase()) {
     for (const t of tokens) {
       console.log(`allowlisting    : ${t}`);
