@@ -28,7 +28,7 @@ const Body = z.object({
   recipientHandle: z.string().min(3).max(24),
   body: z.string().min(1).max(MAX_HTML_LENGTH),
   chain: z.enum(["ethereum", "solana"]).optional(),
-  token: z.enum(["USDC", "USDT", "USDG"]).optional(),
+  token: z.enum(["USDC", "USDT", "USDG", "PUSD"]).optional(),
   txHash: z.string().optional(),
   amountUSD: z.number().nonnegative().optional(),
   fromAddress: z.string().optional(),

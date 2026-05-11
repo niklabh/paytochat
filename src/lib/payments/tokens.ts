@@ -41,6 +41,17 @@ const SOLANA_MINTS: Record<
     decimals: 6,
     tokenProgram: "spl-token-2022",
   },
+  // Palm USD (PUSD) — Shariah-compliant USD stablecoin issued by Palm
+  // Azgar Finance. Token-2022 mint; on the Solana side it currently only
+  // declares `metadataPointer` + `tokenMetadata`. No transferFee /
+  // transferHook / permanentDelegate today, so no fee-on-transfer
+  // surprises — but the mint authority is still live (non-null) so Palm
+  // can mint/blacklist independent of us, same caveat as USDC/USDT/USDG.
+  PUSD: {
+    address: "CZzgUBvxaMLwMhVSLgqJn3npmxoTo6nzMNQPAnwtHF3s",
+    decimals: 6,
+    tokenProgram: "spl-token-2022",
+  },
 };
 
 /**
@@ -61,6 +72,9 @@ const SOLANA_MINTS: Record<
  *   - USDG:    Paxos Global Dollar. Currently only deployed on Ethereum mainnet
  *              (and Ink + X Layer, which we don't yet target). See
  *              <https://docs.paxos.com/guides/stablecoin/usdg/mainnet>.
+ *   - PUSD:    Palm USD (Shariah-compliant USD stablecoin). Verified on
+ *              Ethereum mainnet at the address below; not yet observed on
+ *              the L2s we target, so leave undefined there for now.
  */
 const EVM_TOKENS: Record<Token, {
   decimals: number;
@@ -91,6 +105,12 @@ const EVM_TOKENS: Record<Token, {
     decimals: 6,
     addresses: {
       1: "0xe343167631d89B6Ffc58B88d6b7fB0228795491D",
+    },
+  },
+  PUSD: {
+    decimals: 6,
+    addresses: {
+      1: "0xfaF0CEE6b20E2AaA4b80748a6Af4cD89609a3d78",
     },
   },
 };
@@ -154,4 +174,4 @@ export function isTokenSupportedOnChain(
 }
 
 /** All tokens we support somewhere. UI components iterate this. */
-export const ALL_TOKENS: readonly Token[] = ["USDC", "USDT", "USDG"];
+export const ALL_TOKENS: readonly Token[] = ["USDC", "USDT", "USDG", "PUSD"];

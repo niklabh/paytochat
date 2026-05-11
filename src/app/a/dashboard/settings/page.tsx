@@ -27,6 +27,7 @@ export default function SettingsPage() {
   const [acceptUSDC, setAcceptUSDC] = useState(true);
   const [acceptUSDT, setAcceptUSDT] = useState(true);
   const [acceptUSDG, setAcceptUSDG] = useState(true);
+  const [acceptPUSD, setAcceptPUSD] = useState(true);
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [busy, setBusy] = useState(false);
 
@@ -48,6 +49,7 @@ export default function SettingsPage() {
     setAcceptUSDC(profile.settings.acceptedTokens.includes("USDC"));
     setAcceptUSDT(profile.settings.acceptedTokens.includes("USDT"));
     setAcceptUSDG(profile.settings.acceptedTokens.includes("USDG"));
+    setAcceptPUSD(profile.settings.acceptedTokens.includes("PUSD"));
     setEmailNotifications(profile.settings.emailNotifications ?? true);
   }, [profile]);
 
@@ -63,6 +65,7 @@ export default function SettingsPage() {
         ...(acceptUSDC ? (["USDC"] as const) : []),
         ...(acceptUSDT ? (["USDT"] as const) : []),
         ...(acceptUSDG ? (["USDG"] as const) : []),
+        ...(acceptPUSD ? (["PUSD"] as const) : []),
       ];
       if (acceptedChains.length === 0)
         throw new Error("Pick at least one chain.");
@@ -126,7 +129,7 @@ export default function SettingsPage() {
       <Card>
         <h2 className="text-lg font-semibold">Receive wallets</h2>
         <p className="mt-1 text-sm text-muted">
-          Senders pay USDC / USDT / USDG directly to these addresses. We never custody funds.
+          Senders pay USDC / USDT / USDG / PUSD directly to these addresses. We never custody funds.
         </p>
         <div className="mt-4 grid md:grid-cols-2 gap-4">
           <Field label="Ethereum address (mainnet)">
@@ -198,6 +201,7 @@ export default function SettingsPage() {
               <Switch checked={acceptUSDC} onChange={setAcceptUSDC} label="USDC" />
               <Switch checked={acceptUSDT} onChange={setAcceptUSDT} label="USDT" />
               <Switch checked={acceptUSDG} onChange={setAcceptUSDG} label="USDG" />
+              <Switch checked={acceptPUSD} onChange={setAcceptPUSD} label="PUSD" />
             </div>
           </div>
         </div>

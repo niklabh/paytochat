@@ -35,21 +35,22 @@
  *   USDC  EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v   (SPL legacy)
  *   USDT  Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB   (SPL legacy)
  *   USDG  2u1tszSeqZ3qBWF3uNGPFc8TzMk2tdiwknnRMWGWjGWH   (Token-2022) ⚠
+ *   PUSD  CZzgUBvxaMLwMhVSLgqJn3npmxoTo6nzMNQPAnwtHF3s   (Token-2022) ⚠
  * Devnet:
  *   USDC  4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU
  *
- * ⚠ USDG and any other Token-2022 mint will revert against the current
- *   program build. The instruction validates the mint and vault via
- *   `anchor_spl::token::{Mint, TokenAccount}`, which require the legacy
- *   SPL Token program as owner. Upgrade the program to
+ * ⚠ USDG, PUSD, and any other Token-2022 mint will revert against the
+ *   current program build. The instruction validates the mint and vault
+ *   via `anchor_spl::token::{Mint, TokenAccount}`, which require the
+ *   legacy SPL Token program as owner. Upgrade the program to
  *   `anchor_spl::token_interface` (Token-2022 + legacy in one surface)
- *   and re-deploy before allowlisting USDG.
+ *   and re-deploy before allowlisting these mints.
  *
  *   The Next.js app does not depend on this — its Solana payment flow
  *   is a direct SPL transfer (see `payOnSolana` in
- *   `src/lib/payments/client.ts`) and already routes USDG through
- *   `TOKEN_2022_PROGRAM_ID`. The escrow program is a POC for the
- *   future server-mediated flow.
+ *   `src/lib/payments/client.ts`) and already routes Token-2022 mints
+ *   (USDG, PUSD) through `TOKEN_2022_PROGRAM_ID`. The escrow program
+ *   is a POC for the future server-mediated flow.
  */
 
 import { SystemProgram, SYSVAR_RENT_PUBKEY } from "@solana/web3.js";
