@@ -92,7 +92,7 @@ export default function DashboardPage() {
                 Add a wallet to start receiving tips
               </div>
               <div className="text-sm text-muted">
-                You need an Ethereum or Solana address to receive USDC/USDT/USDG.
+                You need an Ethereum or Solana address to receive USDC/USDT/USDG/PUSD.
               </div>
             </div>
             <Link

@@ -14,6 +14,9 @@
  *   USDG_ADDRESS      - if set, allowlists this token. Paxos Global Dollar
  *                       only exists on a subset of chains today (Ethereum
  *                       mainnet, Ink, X Layer); leave blank elsewhere.
+ *   PUSD_ADDRESS      - if set, allowlists this token. Palm USD is
+ *                       currently only verified on Ethereum mainnet;
+ *                       leave blank elsewhere.
  *   RESUME_TX_HASH    - if set, SKIP broadcasting a new deployment and
  *                       just resolve the contract address from this
  *                       previously-broadcast tx hash, then continue with
@@ -154,11 +157,12 @@ async function main() {
   const usdc = process.env.USDC_ADDRESS?.trim();
   const usdt = process.env.USDT_ADDRESS?.trim();
   const usdg = process.env.USDG_ADDRESS?.trim();
-  const tokens = [usdc, usdt, usdg].filter((x): x is string => !!x);
+  const pusd = process.env.PUSD_ADDRESS?.trim();
+  const tokens = [usdc, usdt, usdg, pusd].filter((x): x is string => !!x);
 
   if (tokens.length === 0) {
     console.log(
-      "\nNo USDC_ADDRESS / USDT_ADDRESS / USDG_ADDRESS provided — skipping allowlist.",
+      "\nNo USDC_ADDRESS / USDT_ADDRESS / USDG_ADDRESS / PUSD_ADDRESS provided — skipping allowlist.",
     );
   } else if (initialOwner.toLowerCase() === deployerAddr.toLowerCase()) {
     for (const t of tokens) {

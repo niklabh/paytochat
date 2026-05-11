@@ -351,7 +351,7 @@ export function SendMessageForm({ recipient }: Props) {
         </div>
         <div className="space-y-1.5">
           <Label>Token</Label>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {ALL_TOKENS.map((t) => {
               const enabled = recipient.acceptedTokens.includes(t);
               return (

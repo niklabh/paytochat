@@ -1,7 +1,7 @@
 import type { Timestamp } from "firebase/firestore";
 
 export type Chain = "ethereum" | "solana";
-export type Token = "USDC" | "USDT" | "USDG";
+export type Token = "USDC" | "USDT" | "USDG" | "PUSD";
 
 export interface UserDoc {
   uid: string;
@@ -183,6 +183,6 @@ export const DEFAULT_USER_SETTINGS: UserDoc["settings"] = {
   autoReplyTemplate:
     "Hey! I've moved DMs to Pay to Chat — drop me a message at https://paytochat.fun/{handle} and I'll read it. Even $1 puts you ahead of the spam queue.",
   acceptedChains: ["solana", "ethereum"],
-  acceptedTokens: ["USDC", "USDT", "USDG"],
+  acceptedTokens: ["USDC", "USDT", "USDG", "PUSD"],
   emailNotifications: true,
 };
